@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from 'react'
 import type { GameState, PortKind, Resource, TileType } from '@/types/game'
 import { axialToPixel, buildGraphFromTiles, hexCorners } from '@/lib/shared/boardGeometry'
 
@@ -42,6 +42,80 @@ export function Board({
   onBuildCity: (nodeId: string) => void
   onMoveRobber?: (tileId: string) => void
 }) {
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const [panZoom, setPanZoom] = useState({ scale: 1, tx: 0, ty: 0 })
+  const dragRef = useRef<{ active: boolean; pointerId: number | null; start: { x: number; y: number } | null; origin: { tx: number; ty: number } }>(
+    { active: false, pointerId: null, start: null, origin: { tx: 0, ty: 0 } }
+  )
+
+  const clientToSvg = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current
+    if (!svg) return { x: 0, y: 0 }
+    const pt = svg.createSVGPoint()
+    pt.x = clientX
+    pt.y = clientY
+    const ctm = svg.getScreenCTM()
+    if (!ctm) return { x: 0, y: 0 }
+    const inv = ctm.inverse()
+    const sp = pt.matrixTransform(inv)
+    return { x: sp.x, y: sp.y }
+  }, [])
+
+  const onWheel = useCallback((e: WheelEvent<SVGSVGElement>) => {
+    e.preventDefault()
+    const svg = svgRef.current
+    if (!svg) return
+
+    const { x: cx, y: cy } = clientToSvg(e.clientX, e.clientY)
+    setPanZoom((v) => {
+      const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08
+      const nextScale = Math.min(3, Math.max(0.5, v.scale * zoomFactor))
+      // model point under cursor before zoom
+      const px = (cx - v.tx) / v.scale
+      const py = (cy - v.ty) / v.scale
+      // new translate so that px,py stays under cursor
+      const nextTx = cx - px * nextScale
+      const nextTy = cy - py * nextScale
+      return { scale: nextScale, tx: nextTx, ty: nextTy }
+    })
+  }, [clientToSvg])
+
+  const onPointerDown = useCallback((e: PointerEvent<SVGSVGElement>) => {
+    // Pan only with SHIFT + drag (so it doesn't break build/click interactions)
+    if (e.button !== 0 || !e.shiftKey) return
+    const svg = svgRef.current
+    if (!svg) return
+    try { svg.setPointerCapture(e.pointerId) } catch {}
+
+    const p = clientToSvg(e.clientX, e.clientY)
+    dragRef.current.active = true
+    dragRef.current.pointerId = e.pointerId
+    dragRef.current.start = p
+    dragRef.current.origin = { tx: panZoom.tx, ty: panZoom.ty }
+  }, [clientToSvg, panZoom.tx, panZoom.ty])
+
+  const onPointerMove = useCallback((e: PointerEvent<SVGSVGElement>) => {
+    if (!dragRef.current.active) return
+    if (dragRef.current.pointerId !== e.pointerId) return
+    const start = dragRef.current.start
+    if (!start) return
+    const p = clientToSvg(e.clientX, e.clientY)
+    const dx = p.x - start.x
+    const dy = p.y - start.y
+    const origin = dragRef.current.origin
+    setPanZoom((v) => ({ ...v, tx: origin.tx + dx, ty: origin.ty + dy }))
+  }, [clientToSvg])
+
+  const endDrag = useCallback((e: PointerEvent<SVGSVGElement>) => {
+    if (!dragRef.current.active) return
+    dragRef.current.active = false
+    dragRef.current.pointerId = null
+    dragRef.current.start = null
+    const svg = svgRef.current
+    if (svg) {
+      try { svg.releasePointerCapture(e.pointerId) } catch {}
+    }
+  }, [])
 
   const robberMoveMode = Boolean((game as any).robber?.pending) && (game as any).robber?.byPlayerId === me && !Boolean((game as any).robber?.awaitingSteal)
 
@@ -130,7 +204,18 @@ const pointInAnyHex = (p: { x: number; y: number }) => {
   return (
     <section className="rounded-2xl border border-white/10 bg-white/5 p-2 shadow-xl shadow-black/20 md:p-3">
       <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black/10">
+        <div className="pointer-events-none absolute right-2 top-2 rounded-lg bg-black/40 px-2 py-1 text-[11px] text-white/80">
+          Zoom: görgő • Mozgatás: <span className="font-semibold">Shift</span> + húzás
+        </div>
         <svg
+          ref={svgRef}
+          onWheel={onWheel}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onPointerLeave={endDrag}
+          style={{ touchAction: 'none' }}
           viewBox={`${extents.minX} ${extents.minY} ${extents.w} ${extents.h}`}
           className="h-[55vh] w-full min-h-[380px] select-none md:h-[62vh] lg:h-[68vh]"
           role="img"
@@ -180,6 +265,7 @@ const pointInAnyHex = (p: { x: number; y: number }) => {
               <path d="M-4 10 L10 -4" stroke="rgba(251,191,36,.12)" strokeWidth="2" />
             </pattern>
           </defs>
+          <g transform={`translate(${panZoom.tx} ${panZoom.ty}) scale(${panZoom.scale})`}>
 
           {/* Ocean background */}
           <rect x={extents.minX} y={extents.minY} width={extents.w} height={extents.h} fill="url(#p_waves)" opacity={0.45} />
@@ -477,6 +563,7 @@ const labelPos = { x: mid.x + nx * offset, y: mid.y + ny * offset }
               )
             })
             : null}
+          </g>
         </svg>
 
         <div className="absolute left-2 top-2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs text-slate-200">

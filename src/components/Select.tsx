@@ -164,7 +164,7 @@ export default function Dropdown(
                         : "pointer-events-none scale-95 opacity-0",
                 ].join(" ")}
             >
-                <ul className="p-2 text-sm font-medium text-gray-100 bg-slate-800" role="none" key={props.id + "-menu"}>
+                <ul className="p-2 text-sm font-medium text-gray-100 bg-slate-800">
                     {items.map((item, idx) => (
                         <li key={idx}>
                             <a
