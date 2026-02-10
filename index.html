@@ -1,0 +1,469 @@
+<!-- CATAN UI WIREFRAME (mock) -->
+<div class="app">
+    <header class="topbar">
+        <div class="brand">Catan Online</div>
+        <div class="room">
+            <span>Szoba:</span>
+            <strong>#ABCD12</strong>
+            <button class="btn">Meghívó link</button>
+        </div>
+        <div class="me">
+            <span>Te:</span> <strong>Player 1</strong>
+            <span class="pill">Kör: Player 2</span>
+        </div>
+    </header>
+
+    <main class="layout">
+        <aside class="left">
+            <section class="panel">
+                <h3>Játékosok</h3>
+                <div class="player active">
+                    <div class="name">Player 1 (Te)</div>
+                    <div class="stats">
+                        <span>VP: 2</span><span>Ut: 0</span><span>Hosszú út: –</span>
+                    </div>
+                    <div class="res">
+                        <span>Fa 2</span><span>Tégla 1</span><span>Búza 0</span><span>Juh 1</span><span>Érc 0</span>
+                    </div>
+                </div>
+                <div class="player">
+                    <div class="name">Player 2</div>
+                    <div class="stats"><span>VP: 3</span><span>Ut: 1</span><span>Hosszú út: ✓</span></div>
+                    <div class="res muted">Erőforrások rejtve</div>
+                </div>
+                <div class="player">
+                    <div class="name">Player 3</div>
+                    <div class="stats"><span>VP: 1</span><span>Ut: 0</span><span>Hosszú út: –</span></div>
+                    <div class="res muted">Erőforrások rejtve</div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h3>Log</h3>
+                <div class="log">
+                    <div>Player 2 dobott: 8</div>
+                    <div>Player 2 épített: út</div>
+                    <div>Player 1 kapott: fa</div>
+                </div>
+            </section>
+        </aside>
+
+        <section class="boardWrap">
+            <div class="board">
+                <!-- Ide jön a hex grid (SVG/canvas/HTML). -->
+                <div class="hexgrid">
+                    <div class="hex desert">
+                        <div class="num">–</div>
+                        <div class="robber">Rabló</div>
+                    </div>
+                    <div class="hex forest">
+                        <div class="num">11</div>
+                    </div>
+                    <div class="hex clay">
+                        <div class="num">6</div>
+                    </div>
+                    <div class="hex wheat">
+                        <div class="num">9</div>
+                    </div>
+                    <div class="hex sheep">
+                        <div class="num">4</div>
+                    </div>
+                    <div class="hex ore">
+                        <div class="num">10</div>
+                    </div>
+                    <!-- ... -->
+                </div>
+
+                <!-- „kattintható” csomópontok / élek -->
+                <div class="overlayHint">
+                    <div>Állapot: <strong>Építés</strong> (település lerakása)</div>
+                    <div>Kattints egy csomópontra</div>
+                </div>
+            </div>
+
+            <div class="hand">
+                <div class="handRow">
+                    <div class="card">Fa x2</div>
+                    <div class="card">Tégla x1</div>
+                    <div class="card">Juh x1</div>
+                    <div class="card dev">Fejlesztés (0)</div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="right">
+            <section class="panel">
+                <h3>Kör akciók</h3>
+                <div class="actions">
+                    <button class="btn primary">Dobás</button>
+                    <button class="btn">Kereskedelem</button>
+                    <button class="btn">Építés</button>
+                    <button class="btn">Fejlesztés vásárlás</button>
+                    <button class="btn danger">Kör vége</button>
+                </div>
+                <div class="sub">
+                    <div class="hint">Építés mód: válassz (út / település / város)</div>
+                    <div class="mode">
+                        <button class="chip">Út</button>
+                        <button class="chip active">Település</button>
+                        <button class="chip">Város</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h3>Bank / Kikötők</h3>
+                <div class="bank">
+                    <div class="rate">Alap: 4:1</div>
+                    <div class="tradeRow">
+                        <select>
+                            <option>Fa</option>
+                            <option>Tégla</option>
+                            <option>Búza</option>
+                            <option>Juh</option>
+                            <option>Érc</option>
+                        </select>
+                        <span>→</span>
+                        <select>
+                            <option>Búza</option>
+                            <option>Fa</option>
+                            <option>Tégla</option>
+                            <option>Juh</option>
+                            <option>Érc</option>
+                        </select>
+                        <button class="btn">Csere</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h3>Chat</h3>
+                <div class="chat">
+                    <div class="msg"><strong>Player 3:</strong> csere? 1 tégla → 1 fa</div>
+                    <div class="msg"><strong>Player 1:</strong> lehet</div>
+                </div>
+                <div class="chatInput">
+                    <input placeholder="Üzenet..." />
+                    <button class="btn">Küld</button>
+                </div>
+            </section>
+        </aside>
+    </main>
+</div>
+
+<style>
+    :root {
+        --bg: #0b1220;
+        --panel: #121b2e;
+        --muted: #7b88a8;
+        --text: #e7ecff;
+        --accent: #6aa6ff;
+        --danger: #ff5c7a
+    }
+
+    * {
+        box-sizing: border-box;
+        font-family: ui-sans-serif, system-ui
+    }
+
+    body {
+        margin: 0;
+        background: linear-gradient(180deg, #070c16, #0b1220);
+        color: var(--text)
+    }
+
+    .app {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column
+    }
+
+    .topbar {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        background: rgba(10, 16, 30, .8);
+        border-bottom: 1px solid rgba(255, 255, 255, .07);
+        backdrop-filter: blur(10px)
+    }
+
+    .brand {
+        font-weight: 800;
+        letter-spacing: .3px
+    }
+
+    .room,
+    .me {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        color: var(--muted)
+    }
+
+    .pill {
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(106, 166, 255, .15);
+        color: #cfe0ff;
+        border: 1px solid rgba(106, 166, 255, .25)
+    }
+
+    .layout {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 320px 1fr 360px;
+        gap: 14px;
+        padding: 14px;
+        max-width: 1600px;
+        margin: 0 auto;
+        width: 100%
+    }
+
+    .panel {
+        background: rgba(18, 27, 46, .9);
+        border: 1px solid rgba(255, 255, 255, .08);
+        border-radius: 18px;
+        padding: 12px 12px 14px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, .25)
+    }
+
+    .panel h3 {
+        margin: 4px 6px 10px;
+        font-size: 14px;
+        color: #cfe0ff
+    }
+
+    .player {
+        padding: 10px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, .08);
+        margin: 8px 6px;
+        background: rgba(255, 255, 255, .03)
+    }
+
+    .player.active {
+        border-color: rgba(106, 166, 255, .4);
+        background: rgba(106, 166, 255, .08)
+    }
+
+    .stats,
+    .res {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 6px
+    }
+
+    .res.muted {
+        opacity: .8
+    }
+
+    .log {
+        height: 220px;
+        overflow: auto;
+        color: var(--muted);
+        font-size: 12px;
+        padding: 0 6px
+    }
+
+    .boardWrap {
+        display: flex;
+        flex-direction: column;
+        gap: 12px
+    }
+
+    .board {
+        position: relative;
+        flex: 1;
+        min-height: 560px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, .08);
+        background: radial-gradient(1200px 600px at 50% 30%, rgba(106, 166, 255, .12), transparent 55%), rgba(18, 27, 46, .65);
+        overflow: hidden
+    }
+
+    .hexgrid {
+        display: grid;
+        grid-template-columns: repeat(6, 96px);
+        gap: 12px;
+        justify-content: center;
+        padding: 26px
+    }
+
+    .hex {
+        width: 96px;
+        height: 84px;
+        clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, .1);
+        background: rgba(255, 255, 255, .05)
+    }
+
+    .hex .num {
+        font-weight: 800
+    }
+
+    .hex.desert {
+        background: rgba(255, 213, 140, .10)
+    }
+
+    .hex.forest {
+        background: rgba(120, 255, 170, .08)
+    }
+
+    .hex.clay {
+        background: rgba(255, 150, 120, .08)
+    }
+
+    .hex.wheat {
+        background: rgba(255, 235, 140, .08)
+    }
+
+    .hex.sheep {
+        background: rgba(200, 255, 200, .08)
+    }
+
+    .hex.ore {
+        background: rgba(200, 220, 255, .08)
+    }
+
+    .robber {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--muted)
+    }
+
+    .overlayHint {
+        position: absolute;
+        left: 14px;
+        bottom: 14px;
+        background: rgba(0, 0, 0, .25);
+        border: 1px solid rgba(255, 255, 255, .10);
+        padding: 10px 12px;
+        border-radius: 14px;
+        color: #cfe0ff
+    }
+
+    .hand {
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, .08);
+        background: rgba(18, 27, 46, .85);
+        padding: 10px
+    }
+
+    .handRow {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap
+    }
+
+    .card {
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, .08);
+        background: rgba(255, 255, 255, .03);
+        color: #cfe0ff
+    }
+
+    .card.dev {
+        opacity: .9
+    }
+
+    .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding: 0 6px
+    }
+
+    .btn {
+        border: 1px solid rgba(255, 255, 255, .12);
+        background: rgba(255, 255, 255, .04);
+        color: #dbe6ff;
+        border-radius: 14px;
+        padding: 10px 12px;
+        cursor: pointer
+    }
+
+    .btn.primary {
+        background: rgba(106, 166, 255, .18);
+        border-color: rgba(106, 166, 255, .35)
+    }
+
+    .btn.danger {
+        background: rgba(255, 92, 122, .14);
+        border-color: rgba(255, 92, 122, .35)
+    }
+
+    .sub {
+        margin-top: 12px;
+        padding: 0 6px;
+        color: var(--muted);
+        font-size: 12px
+    }
+
+    .mode {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px
+    }
+
+    .chip {
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, .12);
+        background: rgba(255, 255, 255, .03);
+        color: #dbe6ff;
+        cursor: pointer
+    }
+
+    .chip.active {
+        border-color: rgba(106, 166, 255, .4);
+        background: rgba(106, 166, 255, .14)
+    }
+
+    .bank {
+        padding: 0 6px;
+        color: var(--muted);
+        font-size: 12px
+    }
+
+    .tradeRow {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto;
+        gap: 8px;
+        align-items: center;
+        margin-top: 10px
+    }
+
+    select,
+    input {
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, .12);
+        background: rgba(0, 0, 0, .15);
+        color: var(--text);
+        padding: 10px
+    }
+
+    .chat {
+        height: 220px;
+        overflow: auto;
+        padding: 0 6px;
+        color: var(--muted);
+        font-size: 12px
+    }
+
+    .chatInput {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 10px 6px 0
+    }
+</style>
