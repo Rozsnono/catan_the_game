@@ -1,7 +1,7 @@
 'use client'
 
 import type { GameState, Resource } from '@/types/game'
-import { ResourceIcon } from './icons'
+import { LargestArmyIcon, ResourceIcon, RoadIcon } from './icons'
 
 const order: { key: Resource; label: string; pattern: string }[] = [
   { key: 'wood', label: 'Fa', pattern: 'p_wood' },
@@ -89,6 +89,48 @@ export function ResourceCardsPanel({ game }: { game: GameState }) {
             </div>
           </div>
         ))}
+
+        {
+          game.largestArmyPlayerId === game.you?.playerId || true && (
+            <div
+              className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-3"
+            >
+              <div className="relative">
+                <HexIcon patternId={''} />
+                <div className="absolute inset-0 flex items-center justify-center text-slate-100">
+                  <LargestArmyIcon className="h-6 w-6 opacity-90" />
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-100">Legnagyobb hadsereg</div>
+                <div className="mt-0.5 text-xs text-slate-400">
+                  +2 VP
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        {
+          game.largestArmyPlayerId === game.you?.playerId || true && (
+            <div
+              className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-3"
+            >
+              <div className="relative">
+                <HexIcon patternId={''} />
+                <div className="absolute inset-0 flex items-center justify-center text-slate-100">
+                  <LargestArmyIcon className="h-6 w-6 opacity-90" />
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-100">Legnagyobb hadsereg</div>
+                <div className="mt-0.5 text-xs text-slate-400">
+                  +2 VP
+                </div>
+              </div>
+            </div>
+          )
+        }
       </div>
 
       <div className="mt-3 text-xs text-slate-500">

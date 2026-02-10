@@ -85,7 +85,7 @@ export function Board({
     if (e.button !== 0 || !e.shiftKey) return
     const svg = svgRef.current
     if (!svg) return
-    try { svg.setPointerCapture(e.pointerId) } catch {}
+    try { svg.setPointerCapture(e.pointerId) } catch { }
 
     const p = clientToSvg(e.clientX, e.clientY)
     dragRef.current.active = true
@@ -113,7 +113,7 @@ export function Board({
     dragRef.current.start = null
     const svg = svgRef.current
     if (svg) {
-      try { svg.releasePointerCapture(e.pointerId) } catch {}
+      try { svg.releasePointerCapture(e.pointerId) } catch { }
     }
   }, [])
 
@@ -134,32 +134,32 @@ export function Board({
     return { x: sx / game.tiles.length, y: sy / game.tiles.length }
   }, [game.tiles, size])
 
-const tilePolys = useMemo(() => {
-  return game.tiles.map((t) => {
-    const c = axialToPixel(t.q, t.r, size)
-    return hexCorners(c, size)
-  })
-}, [game.tiles, size])
+  const tilePolys = useMemo(() => {
+    return game.tiles.map((t) => {
+      const c = axialToPixel(t.q, t.r, size)
+      return hexCorners(c, size)
+    })
+  }, [game.tiles, size])
 
-const pointInPolygon = (p: { x: number; y: number }, poly: { x: number; y: number }[]) => {
-  // Ray-casting algorithm
-  let inside = false
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const xi = poly[i].x, yi = poly[i].y
-    const xj = poly[j].x, yj = poly[j].y
-    const intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < ((xj - xi) * (p.y - yi)) / (yj - yi + 1e-9) + xi)
-    if (intersect) inside = !inside
+  const pointInPolygon = (p: { x: number; y: number }, poly: { x: number; y: number }[]) => {
+    // Ray-casting algorithm
+    let inside = false
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].x, yi = poly[i].y
+      const xj = poly[j].x, yj = poly[j].y
+      const intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < ((xj - xi) * (p.y - yi)) / (yj - yi + 1e-9) + xi)
+      if (intersect) inside = !inside
+    }
+    return inside
   }
-  return inside
-}
 
-const pointInAnyHex = (p: { x: number; y: number }) => {
-  for (const poly of tilePolys) {
-    if (pointInPolygon(p, poly)) return true
+  const pointInAnyHex = (p: { x: number; y: number }) => {
+    for (const poly of tilePolys) {
+      if (pointInPolygon(p, poly)) return true
+    }
+    return false
   }
-  return false
-}
-    const placementsByNode = useMemo(() => {
+  const placementsByNode = useMemo(() => {
     const m = new Map<string, { playerId: string; kind: 'settlement' | 'city' }>()
     for (const n of game.nodes) m.set(n.nodeId, { playerId: n.playerId, kind: n.kind })
     return m
@@ -267,302 +267,344 @@ const pointInAnyHex = (p: { x: number; y: number }) => {
           </defs>
           <g transform={`translate(${panZoom.tx} ${panZoom.ty}) scale(${panZoom.scale})`}>
 
-          {/* Ocean background */}
-          <rect x={extents.minX} y={extents.minY} width={extents.w} height={extents.h} fill="url(#p_waves)" opacity={0.45} />
+            {/* Ocean background */}
+            <rect x={extents.minX} y={extents.minY} width={extents.w} height={extents.h} fill="url(#p_waves)" opacity={0.45} />
 
-          {/* Tiles */}
-          {game.tiles.map((t) => {
-            const c = axialToPixel(t.q, t.r, size)
-            const corners = hexCorners(c, size)
-            const d = corners.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z'
-            const fill = `url(#p_${t.type})`
-            return (
-              <g key={t.id}>
-                <path
-                  d={d}
-                  fill={fill}
-                  stroke={robberMoveMode ? "rgba(248,113,113,.55)" : "rgba(255,255,255,.14)"}
-                  strokeWidth={robberMoveMode ? 3 : 2}
-                  className={robberMoveMode ? "cursor-pointer hover:opacity-95" : undefined}
-                  onClick={robberMoveMode && onMoveRobber ? () => onMoveRobber(t.id) : undefined}
-                />
-
-                {/* number token */}
-                {t.numberToken ? (
-                  <g>
-                    <circle cx={c.x} cy={c.y} r={16} fill="rgba(2,6,23,.55)" stroke="rgba(255,255,255,.16)" />
-                    <text x={c.x} y={c.y + 5} textAnchor="middle" fontSize={14} fontWeight={800} fill={`${t.numberToken === 6 || t.numberToken === 8 ? '#ff4f4f' : 'rgba(226,232,240,.95)'}`}>
-                      {t.numberToken}
-                    </text>
-                  </g>
-                ) : (
-                  <g>
-                    <text x={c.x} y={c.y + 5} textAnchor="middle" fontSize={12} fontWeight={700} fill="rgba(226,232,240,.6)">
-                      {tileLabel(t.type)}
-                    </text>
-                  </g>
-                )}
-
-                {/* robber */}
-                {t.hasRobber ? (
-                  <g>
-                    <circle cx={c.x} cy={c.y - 22} r={10} fill="rgba(15,23,42,.85)" stroke="rgba(255,255,255,.18)" />
-                    <text x={c.x} y={c.y - 18} textAnchor="middle" fontSize={10} fontWeight={800} fill="rgba(248,113,113,.9)">
-                      R
-                    </text>
-                  </g>
-                ) : null}
-              </g>
-            )
-          })}
-
-          {/* Ports (dock starts from a corner; label sits off the edge mid) */}
-          {(game.ports ?? []).map((p) => {
-            const a = graph.nodes.find((n) => n.id === p.nodeA)?.p
-            const b = graph.nodes.find((n) => n.id === p.nodeB)?.p
-            if (!a || !b) return null
-
-            // Midpoint of the shoreline edge.
-            const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-
-            
-// Choose the outward normal by sampling which side is "sea".
-const ex = b.x - a.x
-const ey = b.y - a.y
-const elen = Math.hypot(ex, ey) || 1
-const tx = ex / elen
-const ty = ey / elen
-// One of the two normals
-let nx = -ty
-let ny = tx
-
-const sampleDist = size * 0.65
-const aSide = { x: mid.x + nx * sampleDist, y: mid.y + ny * sampleDist }
-const bSide = { x: mid.x - nx * sampleDist, y: mid.y - ny * sampleDist }
-const aInside = pointInAnyHex(aSide)
-const bInside = pointInAnyHex(bSide)
-
-// Prefer the direction that points outside all land hexes.
-if (aInside && !bInside) { nx = -nx; ny = -ny }
-else if (aInside === bInside) {
-  // Fallback: pick the direction that points away from the board center
-  const cx = mid.x - boardCenter.x
-  const cy = mid.y - boardCenter.y
-  if (nx * cx + ny * cy < 0) { nx = -nx; ny = -ny }
-}
-
-// Port marker sits off the edge midpoint, outward (big enough to be clearly outside the hex).
-const offset = size * 0.82
-const labelPos = { x: mid.x + nx * offset, y: mid.y + ny * offset }
-
-            // Two piers: one from each shoreline corner to the marker.
-            const startA = a
-            const startB = b
-
-            // Dock head (a small platform) at the marker end, oriented perpendicular to the pier.
-            // Use the midpoint-to-marker vector to orient the dock head.
-            const pvx = labelPos.x - mid.x
-            const pvy = labelPos.y - mid.y
-            const plen = Math.hypot(pvx, pvy) || 1
-            const pux = pvx / plen
-            const puy = pvy / plen
-            const px = -puy
-            const py = pux
-            const headLen = 10
-            const halfW = 8
-            const back = { x: labelPos.x - pux * headLen, y: labelPos.y - puy * headLen }
-            const dockPoints = [
-              `${labelPos.x + px * halfW},${labelPos.y + py * halfW}`,
-              `${labelPos.x - px * halfW},${labelPos.y - py * halfW}`,
-              `${back.x - px * halfW},${back.y - py * halfW}`,
-              `${back.x + px * halfW},${back.y + py * halfW}`,
-            ].join(' ')
-
-            return (
-              <g key={p.id}>
-                {/* two piers (one from each corner) */}
-                <line
-                  x1={startA.x}
-                  y1={startA.y}
-                  x2={labelPos.x}
-                  y2={labelPos.y}
-                  stroke="rgba(226,232,240,.22)"
-                  strokeWidth={6}
-                  strokeLinecap="round"
-                />
-                <line
-                  x1={startB.x}
-                  y1={startB.y}
-                  x2={labelPos.x}
-                  y2={labelPos.y}
-                  stroke="rgba(226,232,240,.22)"
-                  strokeWidth={6}
-                  strokeLinecap="round"
-                />
-
-                {/* platform */}
-                <polygon points={dockPoints} fill="rgba(2,6,23,.70)" stroke="rgba(255,255,255,.18)" strokeWidth={2} />
-
-                {/* label marker */}
-                <circle cx={labelPos.x} cy={labelPos.y} r={14} fill="rgba(2,6,23,.70)" stroke="rgba(255,255,255,.18)" />
-                <text x={labelPos.x} y={labelPos.y + 4} textAnchor="middle" fontSize={10} fontWeight={900} fill="rgba(226,232,240,.95)">
-                  {portLabel(p.kind)}
-                </text>
-              </g>
-            )
-          })}
-
-          {/* Roads */}
-          {graph.edges.map((e) => {
-            const owner = placementsByEdge.get(e.id)
-            if (!owner) return null
-            const a = graph.nodes.find((n) => n.id === e.a)!.p
-            const b = graph.nodes.find((n) => n.id === e.b)!.p
-            return (
-              <line
-                key={e.id}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={playerColor.get(owner) ?? 'white'}
-                strokeWidth={8}
-                strokeLinecap="round"
-                opacity={0.9}
-              />
-            )
-          })}
-
-          {/* Settlements */}
-          {graph.nodes.map((n) => {
-            const pl = placementsByNode.get(n.id)
-            if (!pl) return null
-            const col = playerColor.get(pl.playerId) ?? 'white'
-            return (
-              <g key={n.id}>
-                <circle cx={n.p.x} cy={n.p.y} r={10} fill={col} opacity={0.9} />
-                <circle cx={n.p.x} cy={n.p.y} r={11} fill="none" stroke="rgba(2,6,23,.55)" strokeWidth={3} />
-              </g>
-            )
-          })}
-
-          {/* Clickable nodes (setup settlement) */}
-          {canPlaceSettlement
-            ? graph.nodes.map((n) => {
-              const occupied = placementsByNode.has(n.id)
+            {/* Tiles */}
+            {game.tiles.map((t) => {
+              const c = axialToPixel(t.q, t.r, size)
+              const corners = hexCorners(c, size)
+              const d = corners.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z'
+              const fill = `url(#p_${t.type})`
               return (
-                <circle
-                  key={`clickN_${n.id}`}
-                  cx={n.p.x}
-                  cy={n.p.y}
-                  r={13}
-                  strokeWidth={2}
-                  className={(occupied ? '' : 'cursor-pointer hover:opacity-90') + ` ${occupied ? 'fill-transparent' : 'fill-sky-400/5 hover:fill-sky-400/20'} ${occupied ? 'stroke-transparent' : 'stroke-sky-400/30 hover:stroke-sky-400/80'}`}
-                  onClick={() => {
-                    if (occupied) return
-                    onPlaceSettlement(n.id)
-                  }}
+                <g key={t.id}>
+                  <path
+                    d={d}
+                    fill={fill}
+                    stroke={robberMoveMode ? "rgba(248,113,113,.55)" : "rgba(255,255,255,.14)"}
+                    strokeWidth={robberMoveMode ? 3 : 2}
+                    className={robberMoveMode ? "cursor-pointer hover:opacity-95" : undefined}
+                    onClick={robberMoveMode && onMoveRobber ? () => onMoveRobber(t.id) : undefined}
+                  />
+
+                  {/* number token */}
+                  {t.numberToken ? (
+                    <g>
+                      <circle cx={c.x} cy={c.y} r={16} fill="rgba(2,6,23,.55)" stroke="rgba(255,255,255,.16)" />
+                      <text x={c.x} y={c.y + 5} textAnchor="middle" fontSize={14} fontWeight={800} fill={`${t.numberToken === 6 || t.numberToken === 8 ? '#ff4f4f' : 'rgba(226,232,240,.95)'}`}>
+                        {t.numberToken}
+                      </text>
+                    </g>
+                  ) : (
+                    <g>
+                      <text x={c.x} y={c.y + 5} textAnchor="middle" fontSize={12} fontWeight={700} fill="rgba(226,232,240,.6)">
+                        {tileLabel(t.type)}
+                      </text>
+                    </g>
+                  )}
+
+                  {/* robber */}
+                  {t.hasRobber ? (
+                    <g>
+                      <circle cx={c.x} cy={c.y - 22} r={10} fill="rgba(15,23,42,.85)" stroke="rgba(255,255,255,.18)" />
+                      <text x={c.x} y={c.y - 18} textAnchor="middle" fontSize={10} fontWeight={800} fill="rgba(248,113,113,.9)">
+                        R
+                      </text>
+                    </g>
+                  ) : null}
+                </g>
+              )
+            })}
+
+            {/* Ports (dock starts from a corner; label sits off the edge mid) */}
+            {(game.ports ?? []).map((p) => {
+              const a = graph.nodes.find((n) => n.id === p.nodeA)?.p
+              const b = graph.nodes.find((n) => n.id === p.nodeB)?.p
+              if (!a || !b) return null
+
+              // Midpoint of the shoreline edge.
+              const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+
+
+              // Choose the outward normal by sampling which side is "sea".
+              const ex = b.x - a.x
+              const ey = b.y - a.y
+              const elen = Math.hypot(ex, ey) || 1
+              const tx = ex / elen
+              const ty = ey / elen
+              // One of the two normals
+              let nx = -ty
+              let ny = tx
+
+              const sampleDist = size * 0.65
+              const aSide = { x: mid.x + nx * sampleDist, y: mid.y + ny * sampleDist }
+              const bSide = { x: mid.x - nx * sampleDist, y: mid.y - ny * sampleDist }
+              const aInside = pointInAnyHex(aSide)
+              const bInside = pointInAnyHex(bSide)
+
+              // Prefer the direction that points outside all land hexes.
+              if (aInside && !bInside) { nx = -nx; ny = -ny }
+              else if (aInside === bInside) {
+                // Fallback: pick the direction that points away from the board center
+                const cx = mid.x - boardCenter.x
+                const cy = mid.y - boardCenter.y
+                if (nx * cx + ny * cy < 0) { nx = -nx; ny = -ny }
+              }
+
+              // Port marker sits off the edge midpoint, outward (big enough to be clearly outside the hex).
+              const offset = size * 0.82
+              const labelPos = { x: mid.x + nx * offset, y: mid.y + ny * offset }
+
+              // Two piers: one from each shoreline corner to the marker.
+              const startA = a
+              const startB = b
+
+              // Dock head (a small platform) at the marker end, oriented perpendicular to the pier.
+              // Use the midpoint-to-marker vector to orient the dock head.
+              const pvx = labelPos.x - mid.x
+              const pvy = labelPos.y - mid.y
+              const plen = Math.hypot(pvx, pvy) || 1
+              const pux = pvx / plen
+              const puy = pvy / plen
+              const px = -puy
+              const py = pux
+              const headLen = 10
+              const halfW = 8
+              const back = { x: labelPos.x - pux * headLen, y: labelPos.y - puy * headLen }
+              const dockPoints = [
+                `${labelPos.x + px * halfW},${labelPos.y + py * halfW}`,
+                `${labelPos.x - px * halfW},${labelPos.y - py * halfW}`,
+                `${back.x - px * halfW},${back.y - py * halfW}`,
+                `${back.x + px * halfW},${back.y + py * halfW}`,
+              ].join(' ')
+
+              return (
+                <g key={p.id}>
+                  {/* two piers (one from each corner) */}
+                  <line
+                    x1={startA.x}
+                    y1={startA.y}
+                    x2={labelPos.x}
+                    y2={labelPos.y}
+                    stroke="rgba(226,232,240,.22)"
+                    strokeWidth={6}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={startB.x}
+                    y1={startB.y}
+                    x2={labelPos.x}
+                    y2={labelPos.y}
+                    stroke="rgba(226,232,240,.22)"
+                    strokeWidth={6}
+                    strokeLinecap="round"
+                  />
+
+                  {/* platform */}
+                  <polygon points={dockPoints} fill="rgba(2,6,23,.70)" stroke="rgba(255,255,255,.18)" strokeWidth={2} />
+
+                  {/* label marker */}
+                  <circle cx={labelPos.x} cy={labelPos.y} r={14} fill="rgba(2,6,23,.70)" stroke="rgba(255,255,255,.18)" />
+                  <text x={labelPos.x} y={labelPos.y + 4} textAnchor="middle" fontSize={10} fontWeight={900} fill="rgba(226,232,240,.95)">
+                    {portLabel(p.kind)}
+                  </text>
+                </g>
+              )
+            })}
+
+            {/* Roads */}
+            {graph.edges.map((e) => {
+              const owner = placementsByEdge.get(e.id)
+              if (!owner) return null
+              const a = graph.nodes.find((n) => n.id === e.a)!.p
+              const b = graph.nodes.find((n) => n.id === e.b)!.p
+              return (
+                <line
+                  key={e.id}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={playerColor.get(owner) ?? 'white'}
+                  strokeWidth={8}
+                  strokeLinecap="round"
+                  opacity={0.9}
                 />
               )
-            })
-            : null}
+            })}
 
-          {/* Clickable nodes (main build settlement) */}
-          {canBuildSettlement
-            ? graph.nodes.map((n) => {
-              const occupied = placementsByNode.has(n.id)
-              return (
-                <circle
-                  key={`buildSet_${n.id}`}
-                  cx={n.p.x}
-                  cy={n.p.y}
-                  r={14}
-                  strokeWidth={2}
-                  className={(occupied ? '' : 'cursor-pointer hover:opacity-90') + ` ${occupied ? 'fill-transparent' : 'fill-emerald-400/5 hover:fill-emerald-400/20'} ${occupied ? 'stroke-transparent' : 'stroke-emerald-400/30 hover:stroke-emerald-400/80'}`}
-                  onClick={() => {
-                    if (occupied) return
-                    onBuildSettlement(n.id)
-                  }}
-                />
-              )
-            })
-            : null}
-
-          {/* Clickable nodes (main upgrade city) */}
-          {canBuildCity
-            ? graph.nodes.map((n) => {
+            {/* Buildings */}
+            {graph.nodes.map((n) => {
               const pl = placementsByNode.get(n.id)
-              const can = pl && pl.playerId === me && pl.kind === 'settlement'
-              return (
-                <circle
-                  key={`buildCity_${n.id}`}
-                  cx={n.p.x}
-                  cy={n.p.y}
-                  r={14}
-                  strokeWidth={2}
-                  className={(can ? '' : 'cursor-pointer hover:opacity-90') + ` ${can ? 'fill-transparent' : 'fill-amber-400/5 hover:fill-amber-400/20'} ${can ? 'stroke-transparent' : 'stroke-amber-400/30 hover:stroke-amber-400/80'}`}
+              if (!pl) return null
+              const col = playerColor.get(pl.playerId) ?? 'white'
+              const isCity = pl.kind === 'city'
+              const w = isCity ? 26 : 22
+              const h = isCity ? 24 : 20
+              const roofH = isCity ? 12 : 10
+              const bodyTop = -h / 2 + roofH
+              const bodyBottom = h / 2
+              const bodyW = w * (isCity ? 0.78 : 0.74)
+              const roofW = w
+              const stroke = 'rgba(2,6,23,.65)'
 
-                  onClick={() => {
-                    if (!can) return
-                    onBuildCity(n.id)
-                  }}
-                />
-              )
-            })
-            : null}
+              // Simple “house” silhouette (roof + body) centered at (0,0)
+              const housePath = [
+                // roof
+                `M 0 ${-h / 2}`,
+                `L ${roofW / 2} ${bodyTop}`,
+                `L ${bodyW / 2} ${bodyTop}`,
+                // body right
+                `L ${bodyW / 2} ${bodyBottom}`,
+                `L ${-bodyW / 2} ${bodyBottom}`,
+                // body left up
+                `L ${-bodyW / 2} ${bodyTop}`,
+                `L ${-roofW / 2} ${bodyTop}`,
+                'Z',
+              ].join(' ')
 
-          {/* Clickable edges (setup road) */}
-          {canPlaceRoad
-            ? graph.edges.map((e) => {
-              const occupied = placementsByEdge.has(e.id)
-              const a = graph.nodes.find((n) => n.id === e.a)!.p
-              const b = graph.nodes.find((n) => n.id === e.b)!.p
-              return (
-                <line
-                  key={`clickE_${e.id}`}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  strokeWidth={12}
-                  strokeLinecap="round"
-                  opacity={occupied ? 0 : 0.6}
-                  className={(occupied ? '' : 'cursor-pointer') + ` ${(occupied ? 'stroke-transparent' : 'stroke-sky-400/20 hover:stroke-sky-400')}`}
-                  onClick={() => {
-                    if (occupied) return
-                    onPlaceRoad(e.id)
-                  }}
-                />
-              )
-            })
-            : null}
+              // City gets a little “tower” bump to feel more like a bigger building
+              const towerPath = isCity
+                ? [
+                  `M ${-bodyW * 0.18} ${bodyTop}`,
+                  `L ${-bodyW * 0.18} ${bodyTop - roofH * 0.55}`,
+                  `L ${bodyW * 0.18} ${bodyTop - roofH * 0.55}`,
+                  `L ${bodyW * 0.18} ${bodyTop}`,
+                  'Z',
+                ].join(' ')
+                : null
 
-          {/* Clickable edges (main build road) */}
-          {canBuildRoad
-            ? graph.edges.map((e) => {
-              const occupied = placementsByEdge.has(e.id)
-              const a = graph.nodes.find((n) => n.id === e.a)!.p
-              const b = graph.nodes.find((n) => n.id === e.b)!.p
               return (
-                <line
-                  key={`buildRoad_${e.id}`}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke={occupied ? 'transparent' : 'rgba(59,130,246,.40)'}
-                  strokeWidth={12}
-                  strokeLinecap="round"
-                  opacity={occupied ? 0 : 0.6}
-                  className={(occupied ? '' : 'cursor-pointer') + ` ${(occupied ? 'stroke-transparent' : 'stroke-sky-400/20 hover:stroke-sky-400')}`}
-                  onClick={() => {
-                    if (occupied) return
-                    onBuildRoad(e.id)
-                  }}
-                />
+                <g key={n.id} transform={`translate(${n.p.x} ${n.p.y})`}>
+                  {towerPath ? <path d={towerPath} fill={col} opacity={0.95} stroke={stroke} strokeWidth={2.2} /> : null}
+                  <path d={housePath} fill={col} opacity={0.95} stroke={stroke} strokeWidth={2.2} strokeLinejoin="round" />
+                  {/* little door */}
+                  <path
+                    d={`M ${-w * 0.09} ${bodyBottom} L ${-w * 0.09} ${bodyBottom - h * 0.30} L ${w * 0.09} ${bodyBottom - h * 0.30} L ${w * 0.09} ${bodyBottom}`}
+                    fill="rgba(2,6,23,.18)"
+                    stroke="rgba(2,6,23,.35)"
+                    strokeWidth={1.6}
+                  />
+                </g>
               )
-            })
-            : null}
+            })}
+            {/* Clickable nodes (setup settlement) */}
+            {canPlaceSettlement
+              ? graph.nodes.map((n) => {
+                const occupied = placementsByNode.has(n.id)
+                return (
+                  <circle
+                    key={`clickN_${n.id}`}
+                    cx={n.p.x}
+                    cy={n.p.y}
+                    r={13}
+                    strokeWidth={2}
+                    className={(occupied ? '' : 'cursor-pointer hover:opacity-90') + ` ${occupied ? 'fill-transparent' : 'fill-sky-400/5 hover:fill-sky-400/20'} ${occupied ? 'stroke-transparent' : 'stroke-sky-400/30 hover:stroke-sky-400/80'}`}
+                    onClick={() => {
+                      if (occupied) return
+                      onPlaceSettlement(n.id)
+                    }}
+                  />
+                )
+              })
+              : null}
+
+            {/* Clickable nodes (main build settlement) */}
+            {canBuildSettlement
+              ? graph.nodes.map((n) => {
+                const occupied = placementsByNode.has(n.id)
+                return (
+                  <circle
+                    key={`buildSet_${n.id}`}
+                    cx={n.p.x}
+                    cy={n.p.y}
+                    r={14}
+                    strokeWidth={2}
+                    className={(occupied ? '' : 'cursor-pointer hover:opacity-90') + ` ${occupied ? 'fill-transparent' : 'fill-emerald-400/5 hover:fill-emerald-400/20'} ${occupied ? 'stroke-transparent' : 'stroke-emerald-400/30 hover:stroke-emerald-400/80'}`}
+                    onClick={() => {
+                      if (occupied) return
+                      onBuildSettlement(n.id)
+                    }}
+                  />
+                )
+              })
+              : null}
+
+            {/* Clickable nodes (main upgrade city) */}
+            {canBuildCity
+              ? graph.nodes.map((n) => {
+                const pl = placementsByNode.get(n.id)
+                const can = pl && pl.playerId === me && pl.kind === 'settlement'
+                return (
+                  <circle
+                    key={`buildCity_${n.id}`}
+                    cx={n.p.x}
+                    cy={n.p.y}
+                    r={14}
+                    strokeWidth={2}
+                    className={(!can ? '' : 'cursor-pointer hover:opacity-90') + ` ${!can ? 'fill-transparent' : 'fill-amber-400/5 hover:fill-amber-400/20'} ${!can ? 'stroke-transparent' : 'stroke-amber-400/30 hover:stroke-amber-400/80'}`}
+
+                    onClick={() => {
+                      if (!can) return
+                      onBuildCity(n.id)
+                    }}
+                  />
+                )
+              })
+              : null}
+
+            {/* Clickable edges (setup road) */}
+            {canPlaceRoad
+              ? graph.edges.map((e) => {
+                const occupied = placementsByEdge.has(e.id)
+                const a = graph.nodes.find((n) => n.id === e.a)!.p
+                const b = graph.nodes.find((n) => n.id === e.b)!.p
+                return (
+                  <line
+                    key={`clickE_${e.id}`}
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    strokeWidth={12}
+                    strokeLinecap="round"
+                    opacity={occupied ? 0 : 0.6}
+                    className={(occupied ? '' : 'cursor-pointer') + ` ${(occupied ? 'stroke-transparent' : 'stroke-sky-400/20 hover:stroke-sky-400')}`}
+                    onClick={() => {
+                      if (occupied) return
+                      onPlaceRoad(e.id)
+                    }}
+                  />
+                )
+              })
+              : null}
+
+            {/* Clickable edges (main build road) */}
+            {canBuildRoad
+              ? graph.edges.map((e) => {
+                const occupied = placementsByEdge.has(e.id)
+                const a = graph.nodes.find((n) => n.id === e.a)!.p
+                const b = graph.nodes.find((n) => n.id === e.b)!.p
+                return (
+                  <line
+                    key={`buildRoad_${e.id}`}
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke={occupied ? 'transparent' : 'rgba(59,130,246,.40)'}
+                    strokeWidth={12}
+                    strokeLinecap="round"
+                    opacity={occupied ? 0 : 0.6}
+                    className={(occupied ? '' : 'cursor-pointer') + ` ${(occupied ? 'stroke-transparent' : 'stroke-sky-400/20 hover:stroke-sky-400')}`}
+                    onClick={() => {
+                      if (occupied) return
+                      onBuildRoad(e.id)
+                    }}
+                  />
+                )
+              })
+              : null}
           </g>
         </svg>
 
