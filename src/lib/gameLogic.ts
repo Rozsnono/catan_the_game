@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 import type { GameDoc } from '@/models/Game'
+import { MapTemplate } from '@/models/MapTemplate'
 import type { HexTile, Port, PortKind, Resource, TileType, MapType } from '@/types/game'
 import { axialToPixel, buildGraphFromTiles, hexCorners, nodeDistanceOk, pointToNodeId } from '@/lib/shared/boardGeometry'
 
@@ -189,6 +190,65 @@ export function makeTiles(gameId: string, mapType: MapType = 'classic'): HexTile
       return makeClassicTiles(gameId)
   }
 }
+
+function makePortsFromTemplate(
+  tiles: HexTile[],
+  templatePorts: Array<{ q: number; r: number; edge: number; kind: PortKind | 'random' }>,
+  seedStr = 'ports'
+): Port[] {
+  const size = 48
+  const byCoord = new Map<string, HexTile>()
+  for (const t of tiles) byCoord.set(`${t.q},${t.r}`, t)
+
+  // Resolve 'random' placeholder kinds into concrete port kinds.
+  const randomCount = templatePorts.filter((p) => p.kind === 'random').length
+  const rng = mulberry32(hashStringToSeed(`${seedStr}|${tiles.length}|${randomCount}`))
+
+  let randomPool: PortKind[] = []
+  if (randomCount) {
+    // Roughly Catan-like distribution: ~40% 3:1, rest split across 2:1 resources.
+    const threeCount = Math.max(1, Math.round(randomCount * 0.4))
+    const rest = Math.max(0, randomCount - threeCount)
+    randomPool = []
+    for (let i = 0; i < threeCount; i++) randomPool.push('threeToOne')
+
+    const resources: Resource[] = ['wood', 'brick', 'wheat', 'sheep', 'ore']
+    // Fill remaining with resources (cycled), then shuffle.
+    for (let i = 0; i < rest; i++) randomPool.push(resources[i % resources.length] as PortKind)
+
+    // Shuffle pool
+    for (let i = randomPool.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1))
+      const tmp = randomPool[i]
+      randomPool[i] = randomPool[j]
+      randomPool[j] = tmp
+    }
+  }
+
+  const ports: Port[] = []
+  let i = 0
+  let poolIdx = 0
+  for (const p of templatePorts) {
+    const tile = byCoord.get(`${p.q},${p.r}`)
+    if (!tile) continue
+    const center = axialToPixel(tile.q, tile.r, size)
+    const corners = hexCorners(center, size)
+    const a = corners[p.edge % 6]
+    const b = corners[(p.edge + 1) % 6]
+    const nodeA = pointToNodeId(a)
+    const nodeB = pointToNodeId(b)
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+
+    const kind: PortKind =
+      p.kind === 'random'
+        ? (randomPool[poolIdx++ % Math.max(1, randomPool.length)] ?? 'threeToOne')
+        : (p.kind as PortKind)
+
+    ports.push({ id: `P_custom_${i++}`, kind, nodeA, nodeB, mid })
+  }
+  return ports
+}
+
 
 function buildRadiusCoords(radius: number): Array<{ q: number; r: number }> {
   const coords: Array<{ q: number; r: number }> = []
@@ -443,12 +503,25 @@ export function addPlayer(game: GameDoc, name: string): string {
   return playerId
 }
 
-export function startIfPossible(game: GameDoc) {
+export async function startIfPossible(game: GameDoc) {
   if (game.phase !== 'lobby') return
   if (game.players.length < 2) return
   const mapType = ((game as any).mapType ?? 'classic') as any
-  game.tiles = makeTiles(game._id, mapType)
-    ; (game as any).ports = makeClassicPorts(game._id, game.tiles as any)
+
+  if (mapType === 'custom' && (game as any).mapTemplateId) {
+    const tmpl = await MapTemplate.findById((game as any).mapTemplateId).lean()
+    if (tmpl && Array.isArray(tmpl.hexes) && tmpl.hexes.length > 0) {
+      game.tiles = makeTilesFromCoords(game._id, tmpl.hexes as any, { deserts: 1, seedTag: 'custom' })
+      const tPorts = (tmpl.ports ?? []) as any[]
+      ;(game as any).ports = tPorts.length ? makePortsFromTemplate(game.tiles as any, tPorts, game._id) : makeClassicPorts(game._id, game.tiles as any)
+    } else {
+      game.tiles = makeTiles(game._id, 'classic')
+      ;(game as any).ports = makeClassicPorts(game._id, game.tiles as any)
+    }
+  } else {
+    game.tiles = makeTiles(game._id, mapType)
+    ;(game as any).ports = makeClassicPorts(game._id, game.tiles as any)
+  }
   game.phase = 'setup'
   game.setupStep = 'place_settlement'
   game.setup.round = 1
@@ -1006,6 +1079,9 @@ export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
 
   return {
     _id: game._id,
+    mapType: ((game as any).mapType ?? 'classic') as any,
+    mapTemplateId: (game as any).mapTemplateId ?? null,
+    settings: (game as any).settings ?? { maxVictoryPoints: 10, maxPlayers: 4 },
     createdAt: game.createdAt.toISOString(),
     updatedAt: game.updatedAt.toISOString(),
     phase: game.phase,

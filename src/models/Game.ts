@@ -143,7 +143,8 @@ const GameSchema = new Schema(
   {
     _id: { type: String, required: true },
     // Board preset used when the game starts.
-    mapType: { type: String, default: "classic" }, // "classic" | "large" | "islands" | "world"
+    mapType: { type: String, default: "classic" }, // "classic" | "large" | "islands" | "world" | "custom"
+    mapTemplateId: { type: String, default: null },
     settings: {
       maxVictoryPoints: { type: Number, default: 10 },
       maxPlayers: { type: Number, default: 4 },

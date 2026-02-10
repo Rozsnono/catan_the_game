@@ -7,7 +7,18 @@ export type DevCard = { id: string; kind: DevCardKind; boughtTurn: number }
 
 export type Phase = 'lobby' | 'setup' | 'main' | 'finished'
 
-export type MapType = 'classic' | 'large' | 'islands' | 'world'
+export type MapType = 'classic' | 'large' | 'islands' | 'world' | 'custom'
+
+export type MapTemplatePortKind = 'threeToOne' | Resource | 'random'
+
+export type MapTemplate = {
+  _id: string
+  name: string
+  hexes: { q: number; r: number }[]
+  ports: { q: number; r: number; edge: 0 | 1 | 2 | 3 | 4 | 5; kind: MapTemplatePortKind }[]
+  createdAt?: string
+  updatedAt?: string
+}
 
 export type GameSettings = { maxVictoryPoints: number; maxPlayers: number }
 
@@ -66,6 +77,7 @@ export type EdgePlacement = {
 export type GameState = {
   _id: string
   mapType?: MapType
+  mapTemplateId?: string | null
   settings?: GameSettings
   createdAt: string
   updatedAt: string

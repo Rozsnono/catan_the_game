@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!game) return new NextResponse('Nincs ilyen játék.', { status: 404 })
 
   const playerId = addPlayer(game as any, body.name.trim())
-  startIfPossible(game as any) // auto-start when 2nd player joins
+  await startIfPossible(game as any) // auto-start when 2nd player joins
   await game.save()
 
   return NextResponse.json({ gameId: game._id, playerId })

@@ -4,6 +4,7 @@ type Item = { label: React.ReactNode; href?: string; onClick?: () => void };
 
 export default function Dropdown(
     props: {
+        id?: string;
         items: Item[];
         label: React.ReactNode;
         className?: string;
@@ -115,7 +116,7 @@ export default function Dropdown(
     };
 
     return (
-        <div ref={wrapRef} className={`relative inline-block text-left w-fit ${props.className ?? ''}`}>
+        <div ref={wrapRef} id={props.id} key={props.id} className={`relative inline-block text-left w-fit ${props.className ?? ''}`}>
             <button
                 ref={buttonRef}
                 type="button"
