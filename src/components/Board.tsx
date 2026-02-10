@@ -59,7 +59,33 @@ export function Board({
     }
     return { x: sx / game.tiles.length, y: sy / game.tiles.length }
   }, [game.tiles, size])
-  const placementsByNode = useMemo(() => {
+
+const tilePolys = useMemo(() => {
+  return game.tiles.map((t) => {
+    const c = axialToPixel(t.q, t.r, size)
+    return hexCorners(c, size)
+  })
+}, [game.tiles, size])
+
+const pointInPolygon = (p: { x: number; y: number }, poly: { x: number; y: number }[]) => {
+  // Ray-casting algorithm
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y
+    const xj = poly[j].x, yj = poly[j].y
+    const intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < ((xj - xi) * (p.y - yi)) / (yj - yi + 1e-9) + xi)
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
+const pointInAnyHex = (p: { x: number; y: number }) => {
+  for (const poly of tilePolys) {
+    if (pointInPolygon(p, poly)) return true
+  }
+  return false
+}
+    const placementsByNode = useMemo(() => {
     const m = new Map<string, { playerId: string; kind: 'settlement' | 'city' }>()
     for (const n of game.nodes) m.set(n.nodeId, { playerId: n.playerId, kind: n.kind })
     return m
@@ -213,25 +239,35 @@ export function Board({
             // Midpoint of the shoreline edge.
             const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
 
-            // Outward normal from the edge (choose the direction that points away from the board center).
-            const ex = b.x - a.x
-            const ey = b.y - a.y
-            const elen = Math.hypot(ex, ey) || 1
-            const tx = ex / elen
-            const ty = ey / elen
-            // normals
-            let nx = -ty
-            let ny = tx
-            const cx = mid.x - boardCenter.x
-            const cy = mid.y - boardCenter.y
-            if (nx * cx + ny * cy < 0) {
-              nx = -nx
-              ny = -ny
-            }
+            
+// Choose the outward normal by sampling which side is "sea".
+const ex = b.x - a.x
+const ey = b.y - a.y
+const elen = Math.hypot(ex, ey) || 1
+const tx = ex / elen
+const ty = ey / elen
+// One of the two normals
+let nx = -ty
+let ny = tx
 
-            // Port marker sits 20px off the edge midpoint, outward.
-            const offset = 20
-            const labelPos = { x: mid.x + nx * offset, y: mid.y + ny * offset }
+const sampleDist = size * 0.65
+const aSide = { x: mid.x + nx * sampleDist, y: mid.y + ny * sampleDist }
+const bSide = { x: mid.x - nx * sampleDist, y: mid.y - ny * sampleDist }
+const aInside = pointInAnyHex(aSide)
+const bInside = pointInAnyHex(bSide)
+
+// Prefer the direction that points outside all land hexes.
+if (aInside && !bInside) { nx = -nx; ny = -ny }
+else if (aInside === bInside) {
+  // Fallback: pick the direction that points away from the board center
+  const cx = mid.x - boardCenter.x
+  const cy = mid.y - boardCenter.y
+  if (nx * cx + ny * cy < 0) { nx = -nx; ny = -ny }
+}
+
+// Port marker sits off the edge midpoint, outward (big enough to be clearly outside the hex).
+const offset = size * 0.82
+const labelPos = { x: mid.x + nx * offset, y: mid.y + ny * offset }
 
             // Two piers: one from each shoreline corner to the marker.
             const startA = a

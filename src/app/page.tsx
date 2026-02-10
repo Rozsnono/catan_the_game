@@ -74,6 +74,7 @@ export default function Home() {
     try {
       const data = await getJSON<{ templates: MapTemplate[] }>(`/api/templates`)
       setTemplates((data.templates ?? []).map((t) => ({ _id: t._id, name: t.name })))
+      setMapSource('template');
     } catch {
       // ignore
     }
@@ -174,7 +175,7 @@ export default function Home() {
                         label={<span className="font-semibold text-slate-100">{mapSource === 'preset' ? 'Beépített' : 'Saját sablon'}</span>}
                         items={[
                           { label: 'Beépített térképek', onClick: () => setMapSource('preset') },
-                          { label: 'Saját sablon (editor)', onClick: () => setMapSource('template') },
+                          { label: 'Saját sablon (editor)', onClick: () => refreshTemplates() },
                         ]}
                         className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-100 hover:bg-black/25"
                         disabled={loading}
