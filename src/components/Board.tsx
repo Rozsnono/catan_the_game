@@ -43,7 +43,7 @@ export function Board({
   onMoveRobber?: (tileId: string) => void
 }) {
 
-const robberMoveMode = Boolean((game as any).robber?.pending) && (game as any).robber?.byPlayerId === me && !Boolean((game as any).robber?.awaitingSteal)
+  const robberMoveMode = Boolean((game as any).robber?.pending) && (game as any).robber?.byPlayerId === me && !Boolean((game as any).robber?.awaitingSteal)
 
   const size = 48 // base hex size in px (SVG units)
   const graph = useMemo(() => buildGraphFromTiles(game.tiles, size), [game.tiles])
@@ -111,30 +111,52 @@ const robberMoveMode = Boolean((game as any).robber?.pending) && (game as any).r
           aria-label="Catan tábla"
         >
           <defs>
+            <linearGradient id="g_ocean" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(2, 132, 199, .1)" />
+              <stop offset="60%" stopColor="rgba(30, 58, 138, .1)" />
+              <stop offset="100%" stopColor="rgba(2, 6, 23, .1)" />
+            </linearGradient>
+            <pattern id="p_waves" width="120" height="60" patternUnits="userSpaceOnUse">
+              <path d="M0 42 C 20 30, 40 30, 60 42 S 100 54, 120 42" fill="none" stroke="rgba(226,232,240,.10)" strokeWidth="2" />
+            </pattern>
             <pattern id="p_wood" width="12" height="12" patternUnits="userSpaceOnUse">
+              <rect x="0" y="0" width="10" height="10" fill="rgb(16, 20, 35)" />
+              <rect x="0" y="0" width="14" height="14" fill="rgba(0, 92, 8, 0.33)" />
               <path d="M0 12 L12 0" stroke="rgba(34,197,94,.35)" strokeWidth="2" />
             </pattern>
             <pattern id="p_brick" width="14" height="10" patternUnits="userSpaceOnUse">
+              <rect x="0" y="0" width="10" height="10" fill="rgb(16, 20, 35)" />
+              <rect x="0" y="0" width="14" height="10" fill="rgba(35, 5, 5, .4)" />
               <path d="M0 5 H14" stroke="rgba(251,113,133,.35)" strokeWidth="2" />
               <path d="M0 0 H14" stroke="rgba(251,113,133,.20)" strokeWidth="2" />
               <path d="M0 10 H14" stroke="rgba(251,113,133,.20)" strokeWidth="2" />
             </pattern>
             <pattern id="p_wheat" width="10" height="10" patternUnits="userSpaceOnUse">
+              <rect x="0" y="0" width="10" height="10" fill="rgb(16, 20, 35)" />
+              <rect x="0" y="0" width="10" height="10" fill="rgba(250,204,21,.35)" />
               <circle cx="2" cy="2" r="1.6" fill="rgba(250,204,21,.35)" />
               <circle cx="8" cy="6" r="1.6" fill="rgba(250,204,21,.25)" />
             </pattern>
             <pattern id="p_sheep" width="12" height="12" patternUnits="userSpaceOnUse">
-              <circle cx="3" cy="3" r="2" fill="rgba(134,239,172,.28)" />
-              <circle cx="9" cy="9" r="2" fill="rgba(134,239,172,.18)" />
+              <rect x="0" y="0" width="10" height="10" fill="rgb(16, 20, 35)" />
+              <rect x="0" y="0" width="14" height="14" fill="rgba(0, 255, 34, 0.25)" />
+              <circle cx="3" cy="3" r="2" fill="rgba(134,239,172,.4)" />
+              <circle cx="9" cy="9" r="2" fill="rgba(134,239,172,.3)" />
             </pattern>
             <pattern id="p_ore" width="12" height="12" patternUnits="userSpaceOnUse">
+              <rect x="0" y="0" width="10" height="10" fill="rgb(16, 20, 35)" />
+              <rect x="0" y="0" width="14" height="14" fill="rgba(148,163,184,.35)" />
               <path d="M2 10 L6 2 L10 10 Z" fill="rgba(148,163,184,.35)" />
             </pattern>
             <pattern id="p_desert" width="14" height="14" patternUnits="userSpaceOnUse">
+              <rect x="0" y="0" width="14" height="14" fill="rgb(44, 34, 9)" />
               <path d="M0 14 L14 0" stroke="rgba(251,191,36,.20)" strokeWidth="2" />
               <path d="M-4 10 L10 -4" stroke="rgba(251,191,36,.12)" strokeWidth="2" />
             </pattern>
           </defs>
+
+          {/* Ocean background */}
+          <rect x={extents.minX} y={extents.minY} width={extents.w} height={extents.h} fill="url(#p_waves)" opacity={0.45} />
 
           {/* Tiles */}
           {game.tiles.map((t) => {
@@ -172,8 +194,8 @@ const robberMoveMode = Boolean((game as any).robber?.pending) && (game as any).r
                 {/* robber */}
                 {t.hasRobber ? (
                   <g>
-                    <circle cx={c.x + 20} cy={c.y - 18} r={10} fill="rgba(15,23,42,.85)" stroke="rgba(255,255,255,.18)" />
-                    <text x={c.x + 20} y={c.y - 14} textAnchor="middle" fontSize={10} fontWeight={800} fill="rgba(248,113,113,.9)">
+                    <circle cx={c.x} cy={c.y - 22} r={10} fill="rgba(15,23,42,.85)" stroke="rgba(255,255,255,.18)" />
+                    <text x={c.x} y={c.y - 18} textAnchor="middle" fontSize={10} fontWeight={800} fill="rgba(248,113,113,.9)">
                       R
                     </text>
                   </g>

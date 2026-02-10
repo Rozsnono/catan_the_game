@@ -6,6 +6,11 @@ export type DevCardKind = 'knight' | 'victory' | 'road_building' | 'year_of_plen
 export type DevCard = { id: string; kind: DevCardKind; boughtTurn: number }
 
 export type Phase = 'lobby' | 'setup' | 'main' | 'finished'
+
+export type MapType = 'classic' | 'large' | 'islands' | 'world'
+
+export type GameSettings = { maxVictoryPoints: number; maxPlayers: number }
+
 export type SetupStep = 'place_settlement' | 'place_road'
 
 export type PlayerPublic = {
@@ -60,11 +65,10 @@ export type EdgePlacement = {
 
 export type GameState = {
   _id: string
+  mapType?: MapType
+  settings?: GameSettings
   createdAt: string
   updatedAt: string
-
-  winnerPlayerId?: string | null
-  finishedAt?: string | null
 
   phase: Phase
   setupStep: SetupStep
@@ -107,9 +111,6 @@ export type GameState = {
   devPlayedThisTurn?: boolean
   largestArmyPlayerId?: string | null
   largestArmySize?: number
-
-  longestRoadPlayerId?: string | null
-  longestRoadLength?: number
 
   robber?: {
     pending: boolean

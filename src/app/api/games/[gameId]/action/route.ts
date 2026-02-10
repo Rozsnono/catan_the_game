@@ -22,7 +22,6 @@ import {
   sanitizeForClient,
   tradeWithBank,
   validateResourceName,
-  checkGameEnd,
 } from '@/lib/gameLogic'
 
 const Body = z.object({
@@ -154,10 +153,6 @@ export async function POST(req: Request, { params }: { params: { gameId: string 
         break
       }
     }
-
-    // End game automatically when someone reaches 10 VP.
-    // Chat stays usable after finish.
-    checkGameEnd(game as any, body.playerId)
 
     await game.save()
     return NextResponse.json(sanitizeForClient(game as any, body.playerId))

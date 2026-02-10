@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   const games = await Game.find({ phase: { $in: ['lobby', 'setup', 'main'] } })
     .sort({ updatedAt: -1 })
     .limit(limit)
-    .select('_id phase players updatedAt createdAt turnNumber setupStep')
+    .select('_id phase players updatedAt createdAt turnNumber setupStep mapType settings')
     .lean()
 
   return NextResponse.json({
@@ -24,6 +24,8 @@ export async function GET(req: Request) {
       gameId: g._id,
       phase: g.phase,
       turnNumber: g.turnNumber ?? 1,
+      mapType: g.mapType ?? 'classic',
+      settings: g.settings ?? { maxVictoryPoints: 10, maxPlayers: 4 },
       setupStep: g.setupStep ?? null,
       players: (g.players || []).map((p: any) => ({ _id: p._id, name: p.name, color: p.color })),
       playerCount: (g.players || []).length,

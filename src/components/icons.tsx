@@ -179,31 +179,6 @@ export function CopyIcon(props: IconProps & { isCopied?: boolean }) {
   )
 }
 
-export function LongestRoadIcon(props: IconProps) {
-  return (
-    <Base {...props} title={props.title ?? 'Leghosszabb út'}>
-      <path d="M5.5 3 3 21"></path>
-      <path d="m18.5 3 2.482 17.978"></path>
-      <path d="M12 3v3"></path>
-      <path d="M12 17.5V21"></path>
-      <path d="M12 10v3.5"></path>
-    </Base>
-  )
-}
-
-export function LargestArmyIcon(props: IconProps) {
-  return (
-    <Base {...props} title={props.title ?? 'Legnagyobb hadsereg'}>
-      <path d="M7 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"></path>
-      <path d="M17 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"></path>
-      <path d="M12 7a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"></path>
-      <path d="M12 22a5 5 0 0 0-10 0"></path>
-      <path d="M22 22a5 5 0 0 0-10 0"></path>
-      <path d="M17 12a5 5 0 0 0-10 0"></path>
-    </Base>
-  )
-}
-
 export function MenuIcon({ type, isChat, ...props }: IconProps & { type: 'overview' | 'actions' | 'dev' | 'trade' | 'bank' | 'players' | 'chat' | 'log', isChat?: boolean }) {
   switch (type) {
     case 'overview':

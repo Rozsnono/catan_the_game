@@ -1,11 +1,9 @@
 import { nanoid } from 'nanoid'
 import type { GameDoc } from '@/models/Game'
-import type { HexTile, Port, PortKind, Resource, TileType } from '@/types/game'
+import type { HexTile, Port, PortKind, Resource, TileType, MapType } from '@/types/game'
 import { axialToPixel, buildGraphFromTiles, hexCorners, nodeDistanceOk, pointToNodeId } from '@/lib/shared/boardGeometry'
 
 const COLORS = ['#60a5fa', '#f59e0b', '#34d399', '#f472b6']
-
-const WIN_VP = 10
 
 // Robust id comparison: some saved games might have non-string ids.
 const asId = (x: any) => (x == null ? '' : typeof x === 'string' ? x : String(x))
@@ -63,166 +61,6 @@ function ensureDevFields(game: GameDoc) {
   if ((game as any).largestArmyPlayerId === undefined) (game as any).largestArmyPlayerId = null
 }
 
-function ensureFinishFields(game: GameDoc) {
-  if ((game as any).winnerPlayerId === undefined) (game as any).winnerPlayerId = null
-  if ((game as any).finishedAt === undefined) (game as any).finishedAt = null
-}
-
-export function checkGameEnd(game: GameDoc, actorPlayerId?: string) {
-  ensureFinishFields(game)
-  if (game.phase === 'finished') return
-
-  const players: any[] = (game.players as any[]) ?? []
-  const reached = players.filter((p) => Number(p.victoryPoints ?? 0) >= WIN_VP)
-  if (reached.length === 0) return
-
-  // Pick winner:
-  // - highest VP
-  // - if tie: prefer actor (the one who triggered), else currentPlayer
-  // - else first
-  let best = -1
-  for (const p of reached) best = Math.max(best, Number(p.victoryPoints ?? 0))
-  const tied = reached.filter((p) => Number(p.victoryPoints ?? 0) === best)
-  let winner = tied[0]
-  if (actorPlayerId) {
-    const w = tied.find((p) => idEq(p._id, actorPlayerId))
-    if (w) winner = w
-  }
-  if (!winner && (game as any).currentPlayerId) {
-    const w = tied.find((p) => idEq(p._id, (game as any).currentPlayerId))
-    if (w) winner = w
-  }
-
-  game.phase = 'finished'
-  ;(game as any).winnerPlayerId = asId(winner?._id)
-  ;(game as any).finishedAt = new Date()
-
-  if (winner?.name) addLog(game, `🎉 ${winner.name} elérte a ${WIN_VP} győzelmi pontot — a játék véget ért!`)
-}
-
-
-function ensureLongestRoadFields(game: GameDoc) {
-  if ((game as any).longestRoadPlayerId === undefined) (game as any).longestRoadPlayerId = null
-  if (typeof (game as any).longestRoadLength !== 'number') (game as any).longestRoadLength = 0
-}
-
-function computeLongestRoadForPlayer(game: GameDoc, playerId: string): number {
-  const graph = buildGraphFromTiles(game.tiles as any, 48)
-
-  // Opponent settlements/cities block pass-through.
-  const blocked = new Set<string>()
-  for (const n of game.nodes as any[]) {
-    if (n.playerId && !idEq(n.playerId, playerId)) blocked.add(n.nodeId)
-  }
-
-  // Build adjacency from this player's placed edges.
-  const adj = new Map<string, string[]>()
-  const edgeKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`)
-
-  for (const e of game.edges as any[]) {
-    if (!idEq(e.playerId, playerId)) continue
-    const en = graph.edgeNodes[e.edgeId]
-    if (!en) continue
-    if (!adj.has(en.a)) adj.set(en.a, [])
-    if (!adj.has(en.b)) adj.set(en.b, [])
-    adj.get(en.a)!.push(en.b)
-    adj.get(en.b)!.push(en.a)
-  }
-
-  let best = 0
-
-  function dfs(u: string, used: Set<string>, length: number) {
-    if (length > best) best = length
-
-    // If an opponent building is here, the road can end here, but cannot pass through.
-    if (blocked.has(u) && length > 0) return
-
-    const ns = adj.get(u) ?? []
-    for (const v of ns) {
-      const k = edgeKey(u, v)
-      if (used.has(k)) continue
-      used.add(k)
-      dfs(v, used, length + 1)
-      used.delete(k)
-    }
-  }
-
-  for (const start of adj.keys()) {
-    dfs(start, new Set(), 0)
-  }
-
-  return best
-}
-
-function recomputeLongestRoadAward(game: GameDoc) {
-  ensureLongestRoadFields(game)
-
-  // Compute current lengths
-  const lengths = new Map<string, number>()
-  for (const pl of game.players as any[]) {
-    lengths.set(pl._id, computeLongestRoadForPlayer(game, pl._id))
-  }
-
-  let maxLen = 0
-  let leaders: string[] = []
-  for (const [pid, len] of lengths.entries()) {
-    if (len > maxLen) {
-      maxLen = len
-      leaders = [pid]
-    } else if (len === maxLen) {
-      leaders.push(pid)
-    }
-  }
-
-  const threshold = 5
-  const curOwner = (game as any).longestRoadPlayerId as string | null
-  const curLen = Number((game as any).longestRoadLength ?? 0)
-
-  if (maxLen < threshold) {
-    // No one qualifies — clear award (rare in practice).
-    if (curOwner) {
-      const old = (game as any).players.find((x: any) => x._id === curOwner)
-      if (old) old.victoryPoints = Math.max(0, Number(old.victoryPoints ?? 0) - 2)
-    }
-      ; (game as any).longestRoadPlayerId = null
-      ; (game as any).longestRoadLength = 0
-    return
-  }
-
-  // Tie handling: if current owner is among leaders, keep it. Otherwise, do not change owner on a tie.
-  if (leaders.length > 1) {
-    if (curOwner && leaders.includes(curOwner)) {
-        ; (game as any).longestRoadLength = Math.max(curLen, maxLen)
-    }
-    return
-  }
-
-  const winner = leaders[0]
-  if (!winner) return
-
-  // Transfer only if winner beats current length or there is no current owner.
-  if (curOwner === winner) {
-      ; (game as any).longestRoadLength = Math.max(curLen, maxLen)
-    return
-  }
-
-  if (curOwner && maxLen <= curLen) {
-    // Not strictly longer than current record — keep current owner.
-    return
-  }
-
-  // Transfer points
-  if (curOwner) {
-    const old = (game as any).players.find((x: any) => x._id === curOwner)
-    if (old) old.victoryPoints = Math.max(0, Number(old.victoryPoints ?? 0) - 2)
-  }
-  const nw = (game as any).players.find((x: any) => x._id === winner)
-  if (nw) nw.victoryPoints = Number(nw.victoryPoints ?? 0) + 2
-
-    ; (game as any).longestRoadPlayerId = winner
-    ; (game as any).longestRoadLength = maxLen
-  if (nw) addLog(game, `${nw.name} megszerezte: Leghosszabb út (+2 VP).`)
-}
 
 function ensureRobberFields(game: GameDoc) {
   if (!(game as any).robber) {
@@ -338,6 +176,136 @@ export function makeClassicTiles(gameId: string): HexTile[] {
   return tiles
 }
 
+export function makeTiles(gameId: string, mapType: MapType = 'classic'): HexTile[] {
+  switch (mapType) {
+    case 'large':
+      return makeRadiusTiles(gameId, 3, { deserts: 2 })
+    case 'islands':
+      return makeIslandsTiles(gameId)
+    case 'world':
+      return makeWorldTiles(gameId)
+    case 'classic':
+    default:
+      return makeClassicTiles(gameId)
+  }
+}
+
+function buildRadiusCoords(radius: number): Array<{ q: number; r: number }> {
+  const coords: Array<{ q: number; r: number }> = []
+  for (let q = -radius; q <= radius; q++) {
+    for (let r = -radius; r <= radius; r++) {
+      const s = -q - r
+      if (Math.max(Math.abs(q), Math.abs(r), Math.abs(s)) <= radius) coords.push({ q, r })
+    }
+  }
+  return coords
+}
+
+function makeResourceBag(count: number, deserts: number, rand: () => number): TileType[] {
+  const land = count - deserts
+  // Rough, Catan-like distribution.
+  const weights: Array<[Exclude<TileType, 'desert'>, number]> = [
+    ['wood', 22],
+    ['sheep', 22],
+    ['wheat', 22],
+    ['brick', 17],
+    ['ore', 17],
+  ]
+  const bag: TileType[] = []
+  let remaining = land
+  for (let i = 0; i < weights.length; i++) {
+    const [t, w] = weights[i]
+    const n = i === weights.length - 1 ? remaining : Math.max(0, Math.round((land * w) / 100))
+    for (let k = 0; k < n; k++) bag.push(t)
+    remaining -= n
+  }
+  while (bag.length < land) bag.push('wood')
+  while (bag.length > land) bag.pop()
+  for (let i = 0; i < deserts; i++) bag.push('desert')
+  return shuffle(bag, rand)
+}
+
+function makeTokenBag(need: number, rand: () => number): number[] {
+  // Classic token distribution (no 7), repeated and trimmed.
+  const base = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]
+  const tokens: number[] = []
+  while (tokens.length < need) tokens.push(...base)
+  return shuffle(tokens.slice(0, need), rand)
+}
+
+function makeTilesFromCoords(gameId: string, coords: Array<{ q: number; r: number }>, opts?: { deserts?: number; seedTag?: string }): HexTile[] {
+  const seed = hashStringToSeed(gameId + ':' + (opts?.seedTag ?? 'tiles'))
+  const rand = mulberry32(seed)
+  const deserts = Math.min(Math.max(1, opts?.deserts ?? 1), Math.max(1, coords.length - 1))
+  const resources = makeResourceBag(coords.length, deserts, rand)
+  const tokens = makeTokenBag(coords.length - deserts, rand)
+
+  let tokenIdx = 0
+  let robberPlaced = false
+  return coords.map((c, i) => {
+    const type = resources[i]
+    const isDesert = type === 'desert'
+    const numberToken = isDesert ? null : tokens[tokenIdx++]
+    const hasRobber = !robberPlaced && isDesert
+    if (hasRobber) robberPlaced = true
+    return {
+      id: `T${i}_${c.q}_${c.r}`,
+      q: c.q,
+      r: c.r,
+      type,
+      numberToken,
+      hasRobber,
+    }
+  })
+}
+
+function makeRadiusTiles(gameId: string, radius: number, opts?: { deserts?: number }) {
+  const coords = buildRadiusCoords(radius)
+  return makeTilesFromCoords(gameId, coords, { deserts: opts?.deserts ?? (radius >= 3 ? 2 : 1), seedTag: `radius${radius}` })
+}
+
+function makeIslandsTiles(gameId: string): HexTile[] {
+  // Two main islands with a bit of separation (holes = ocean).
+  const coords: Array<{ q: number; r: number }> = []
+  const islandA = buildRadiusCoords(2).map(({ q, r }) => ({ q: q - 2, r }))
+  const islandB = buildRadiusCoords(2).map(({ q, r }) => ({ q: q + 2, r }))
+  // A small third islet
+  const islet = buildRadiusCoords(1).map(({ q, r }) => ({ q, r: r + 3 }))
+
+  const key = (c: any) => `${c.q},${c.r}`
+  const seen = new Set<string>()
+  for (const c of [...islandA, ...islandB, ...islet]) {
+    const k = key(c)
+    if (seen.has(k)) continue
+    seen.add(k)
+    coords.push(c)
+  }
+
+  // Total tiles ~ 19 + 19 + 7 - overlaps => around 45, but still very manageable.
+  // Use 3 deserts to keep robber play interesting on larger maps.
+  return makeTilesFromCoords(gameId, coords, { deserts: 3, seedTag: 'islands' })
+}
+
+function makeWorldTiles(gameId: string): HexTile[] {
+  // One big continent + a few outer archipelagos.
+  const coords: Array<{ q: number; r: number }> = []
+  const continent = buildRadiusCoords(3)
+  const arch1 = buildRadiusCoords(1).map(({ q, r }) => ({ q: q - 5, r: r + 1 }))
+  const arch2 = buildRadiusCoords(1).map(({ q, r }) => ({ q: q + 5, r: r - 1 }))
+  const arch3 = buildRadiusCoords(1).map(({ q, r }) => ({ q: q, r: r + 6 }))
+
+  const key = (c: any) => `${c.q},${c.r}`
+  const seen = new Set<string>()
+  for (const c of [...continent, ...arch1, ...arch2, ...arch3]) {
+    const k = key(c)
+    if (seen.has(k)) continue
+    seen.add(k)
+    coords.push(c)
+  }
+
+  return makeTilesFromCoords(gameId, coords, { deserts: 3, seedTag: 'world' })
+}
+
 function portLabel(kind: PortKind): string {
   if (kind === 'threeToOne') return '3:1'
   const map: Record<Resource, string> = { wood: 'Fa', brick: 'Tégla', wheat: 'Búza', sheep: 'Juh', ore: 'Érc' }
@@ -450,7 +418,8 @@ export function addChat(game: GameDoc, name: string, playerId: string | null, te
 }
 
 export function addPlayer(game: GameDoc, name: string): string {
-  if (game.players.length >= 4) throw new Error('A játék tele van (max 4 játékos).')
+  const maxPlayers = (game as any).settings?.maxPlayers ?? 4
+  if (game.players.length >= maxPlayers) throw new Error(`A játék tele van (max ${maxPlayers} játékos).`)
   const playerId = nanoid(10)
   const color = COLORS[game.players.length % COLORS.length]
   game.players.push({
@@ -477,7 +446,8 @@ export function addPlayer(game: GameDoc, name: string): string {
 export function startIfPossible(game: GameDoc) {
   if (game.phase !== 'lobby') return
   if (game.players.length < 2) return
-  game.tiles = makeClassicTiles(game._id)
+  const mapType = ((game as any).mapType ?? 'classic') as any
+  game.tiles = makeTiles(game._id, mapType)
     ; (game as any).ports = makeClassicPorts(game._id, game.tiles as any)
   game.phase = 'setup'
   game.setupStep = 'place_settlement'
@@ -643,7 +613,6 @@ export function buildRoad(game: GameDoc, playerId: string, edgeId: string) {
 
   game.edges.push({ edgeId, playerId })
   p.roads += 1
-  recomputeLongestRoadAward(game)
 }
 
 export function buildSettlement(game: GameDoc, playerId: string, nodeId: string) {
@@ -694,7 +663,6 @@ export function placeRoad(game: GameDoc, playerId: string, edgeId: string) {
   const p = game.players.find((x) => idEq(x._id, playerId))!
   p.roads += 1
   addLog(game, `${p.name} utat rakott.`)
-  recomputeLongestRoadAward(game)
 
   // Mark setup progress
   const done = (game.setup.done.get(playerId) ?? 0) + 1
@@ -1040,8 +1008,6 @@ export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
     _id: game._id,
     createdAt: game.createdAt.toISOString(),
     updatedAt: game.updatedAt.toISOString(),
-    winnerPlayerId: (game as any).winnerPlayerId ?? null,
-    finishedAt: (game as any).finishedAt ? new Date((game as any).finishedAt).toISOString() : null,
     phase: game.phase,
     setupStep: game.setupStep,
     setupRound: game.setup?.round ?? 1,
@@ -1078,8 +1044,6 @@ export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
     devPlayedThisTurn: (game as any).devPlayedThisTurn ?? false,
     largestArmyPlayerId: (game as any).largestArmyPlayerId ?? null,
     largestArmySize: Number((game as any).largestArmySize ?? 0),
-    longestRoadPlayerId: (game as any).longestRoadPlayerId ?? null,
-    longestRoadLength: Number((game as any).longestRoadLength ?? 0),
     robber: (() => {
       ensureRobberFields(game)
       const r = (game as any).robber

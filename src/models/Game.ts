@@ -142,6 +142,12 @@ const TradeOfferSchema = new Schema(
 const GameSchema = new Schema(
   {
     _id: { type: String, required: true },
+    // Board preset used when the game starts.
+    mapType: { type: String, default: "classic" }, // "classic" | "large" | "islands" | "world"
+    settings: {
+      maxVictoryPoints: { type: Number, default: 10 },
+      maxPlayers: { type: Number, default: 4 },
+    },
     phase: { type: String, required: true, default: 'lobby' },
     setupStep: { type: String, required: true, default: 'place_settlement' },
     currentPlayerId: { type: String, default: null },
@@ -154,10 +160,6 @@ const GameSchema = new Schema(
     chat: { type: [ChatSchema], default: [] },
     lastRoll: { type: LastRollSchema, default: null },
 
-    // game end
-    winnerPlayerId: { type: String, default: null },
-    finishedAt: { type: Date, default: null },
-
     tradeOffers: { type: [TradeOfferSchema], default: [] },
 
     // main phase bookkeeping
@@ -167,9 +169,6 @@ const GameSchema = new Schema(
     devPlayedThisTurn: { type: Boolean, default: false },
     largestArmyPlayerId: { type: String, default: null },
     largestArmySize: { type: Number, default: 0 },
-
-    longestRoadPlayerId: { type: String, default: null },
-    longestRoadLength: { type: Number, default: 0 },
 
     robber: {
       pending: { type: Boolean, default: false },

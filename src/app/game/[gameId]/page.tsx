@@ -88,35 +88,14 @@ export default function GamePage() {
 
   async function act(type: string, payload?: any) {
     if (!playerId) return
-    if (data?.phase === 'finished' && type !== 'chat') {
-      setToast('A játék már véget ért (10 VP).')
-      setTimeout(() => setToast(null), 2500)
-      return
-    }
     try {
       const next = await postJSON<GameState>(`/api/games/${gameId}/action`, { playerId, type, payload })
       mutate(next, false)
-
-      if (type === 'end_turn') {
-        setBuildMode('none')
-      }
-
-      if (type === 'build_settlement' || type === 'build_city') {
-        setBuildMode('none')
-      }
-
-      // Road Building dev card UX: keep road build-mode active until the free roads are used up.
-      if (type === 'build_road') {
-        const remaining = Number(next?.you?.freeRoadsToPlace ?? 0)
-        if (remaining > 0) setBuildMode('road')
-        else setBuildMode('none')
-      }
-
-      return next
+      if (type === 'end_turn') setBuildMode('none')
+      if (type === 'build_road' || type === 'build_settlement' || type === 'build_city') setBuildMode('none')
     } catch (e: any) {
       setToast(e?.message ?? String(e))
       setTimeout(() => setToast(null), 2500)
-      throw e
     }
   }
 
@@ -159,18 +138,6 @@ export default function GamePage() {
   const me = data.you
   const waitingForPlayers = data.players.length < 2
 
-  // const winnerName = useMemo(() => {
-  //   const wid = (data as any).winnerPlayerId as string | null | undefined
-  //   if (!wid) {
-  //     // fallback: infer from VP
-  //     const p = [...data.players].sort((a, b) => (b.victoryPoints ?? 0) - (a.victoryPoints ?? 0))[0]
-  //     return p?.victoryPoints >= 10 ? p.name : null
-  //   }
-  //   return data.players.find((p) => p._id === wid)?.name ?? null
-  // }, [data])
-
-  const winnerName = '';
-
   const PanelShell = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
@@ -188,36 +155,6 @@ export default function GamePage() {
 
   return (
     <div className="relative min-h-[calc(100vh-1rem)]">
-      {data.phase === 'finished' ? (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/60 p-4 backdrop-blur">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950/90 p-5 shadow-2xl">
-            <div className="text-lg font-semibold text-slate-100">Játék vége</div>
-            <div className="mt-1 text-sm text-slate-300">
-              {winnerName ? (
-                <>
-                  <span className="font-semibold text-slate-100">{winnerName}</span> elérte a 10 győzelmi pontot.
-                </>
-              ) : (
-                <>Valaki elérte a 10 győzelmi pontot.</>
-              )}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/15"
-                onClick={() => router.push('/')}
-              >
-                Vissza a főoldalra
-              </button>
-              <button
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10"
-                onClick={() => mutate()}
-              >
-                Frissítés
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
       {toast ? (
         <div className="fixed left-1/2 top-3 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100 backdrop-blur">
           {toast}
@@ -441,14 +378,7 @@ export default function GamePage() {
                     game={data}
                     me={playerId}
                     onBuy={() => act('dev_buy')}
-                    onPlay={async (cardId, payload) => {
-                      const kind = (data.you?.devCards ?? []).find((c: any) => c.id === cardId)?.kind
-                      await act('dev_play', { cardId, payload })
-                      if (kind === 'road_building') {
-                        // Immediately enter road build-mode so you can place both free roads.
-                        setBuildMode('road')
-                      }
-                    }}
+                    onPlay={(cardId, payload) => act('dev_play', { cardId, payload })}
                   />
 
                   <BankPanel game={data} onTrade={(give, get) => act('trade_bank', { give, get })} />
@@ -476,14 +406,7 @@ export default function GamePage() {
                     game={data}
                     me={playerId}
                     onBuy={() => act('dev_buy')}
-                    onPlay={async (cardId, payload) => {
-                      const kind = (data.you?.devCards ?? []).find((c: any) => c.id === cardId)?.kind
-                      await act('dev_play', { cardId, payload })
-                      if (kind === 'road_building') {
-                        // Immediately enter road build-mode so you can place both free roads.
-                        setBuildMode('road')
-                      }
-                    }}
+                    onPlay={(cardId, payload) => act('dev_play', { cardId, payload })}
                   />
                 </PanelShell>
               ) : null}

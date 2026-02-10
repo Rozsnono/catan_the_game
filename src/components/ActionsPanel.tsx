@@ -39,7 +39,6 @@ export function ActionsPanel({
   onJumpDev?: () => void
 }) {
   const isMyTurn = game.currentPlayerId === me
-  const freeRoads = Number(game.you?.freeRoadsToPlace ?? 0)
   const lastRollName = game.lastRoll
     ? game.players.find((p) => p._id === game.lastRoll!.playerId)?.name ?? '—'
     : null
@@ -113,7 +112,7 @@ export function ActionsPanel({
               disabled={!isMyTurn}
             >
               <span className="inline-flex items-center gap-2">
-                <RoadIcon className="text-sm" /> Út {freeRoads > 0 ? `(ingyen: ${freeRoads})` : '(1 fa + 1 tégla)'}
+                <RoadIcon className="text-sm" /> Út (1 fa + 1 tégla)
               </span>
             </button>
             <button
