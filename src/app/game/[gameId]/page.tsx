@@ -156,7 +156,7 @@ export default function GamePage() {
   )
 
   return (
-    <div className="relative min-h-[calc(100vh-1rem)] pb-36 md:pb-6">
+    <div className="relative min-h-[calc(100vh-2rem)] pb-36 md:pb-6">
       {toast ? (
         <div className="fixed left-1/2 top-3 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100 backdrop-blur">
           {toast}

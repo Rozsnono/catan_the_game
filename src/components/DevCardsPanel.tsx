@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { DevCardKind, GameState, Resource } from '@/types/game'
 import { TrophyIcon, ResourcePill } from '@/components/icons'
-import Select from './Select'
+import Select from './shared/Select'
 
 const RES_LABEL: Record<Resource, string> = {
   wood: 'Fa',

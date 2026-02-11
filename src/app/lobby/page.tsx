@@ -4,6 +4,7 @@ import useSWR from 'swr'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { nanoid } from 'nanoid'
+import MapPreview from '@/components/MapPreview'
 
 async function getJSON<T>(url: string): Promise<T> {
   const res = await fetch(url, { method: 'GET' })
@@ -32,6 +33,9 @@ type ListedGame = {
   phase: 'lobby' | 'setup' | 'main' | string
   turnNumber: number
   setupStep: string | null
+  mapType?: 'classic' | 'large' | 'islands' | 'world' | 'custom' | string
+  mapTemplateId?: string | null
+  settings?: { maxVictoryPoints?: number; maxPlayers?: number }
   players: { _id: string; name: string; color: string }[]
   playerCount: number
   updatedAt: string
@@ -43,6 +47,16 @@ function phaseLabel(phase: string) {
   if (phase === 'setup') return 'Setup'
   if (phase === 'main') return 'Játék'
   return phase
+}
+
+function mapLabel(t?: string) {
+  if (!t) return 'Klasszikus'
+  if (t === 'classic') return 'Klasszikus'
+  if (t === 'large') return 'Nagy'
+  if (t === 'islands') return 'Szigetek'
+  if (t === 'world') return 'Világ'
+  if (t === 'custom') return 'Sablon'
+  return t
 }
 
 export default function LobbyPage() {
@@ -99,17 +113,20 @@ export default function LobbyPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
       <header className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 to-white/5 p-6 shadow-xl shadow-black/20">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-extrabold tracking-tight md:text-3xl">Lobby</h1>
           <p className="text-sm text-slate-300">
-            Adj nevet, hozz létre új játékot, vagy csatlakozz egy futóhoz. (A lista 4 másodpercenként frissül.)
+            Indíts új játékot, csatlakozz Game ID-val, vagy folytasd a korábban megnyitottakat.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">Saját név: <span className="text-slate-100">{safeName}</span></span>
+          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">
+            Név: <span className="text-slate-100">{safeName}</span>
+          </span>
+          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">Lista frissítés: 4 mp</span>
           <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">Next.js + MongoDB</span>
         </div>
       </header>
@@ -118,8 +135,8 @@ export default function LobbyPage() {
         {/* Left: create / join */}
         <section className="lg:col-span-2">
           <div className="grid gap-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20">
-              <h2 className="text-base font-semibold text-slate-100">1) Játékos név</h2>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20">
+              <h2 className="text-base font-semibold text-slate-100">Saját név</h2>
               <div className="mt-3 flex gap-2">
                 <input
                   className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-400/50"
@@ -138,9 +155,9 @@ export default function LobbyPage() {
               <p className="mt-2 text-xs text-slate-400">Minimum 2 karakter ajánlott, max 18.</p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20">
-              <h2 className="text-base font-semibold text-slate-100">2) Új játék</h2>
-              <p className="mt-2 text-sm text-slate-300">Létrehoz egy új gameId-t, amit megoszthatsz a többiekkel.</p>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20">
+              <h2 className="text-base font-semibold text-slate-100">Új játék</h2>
+              <p className="mt-2 text-sm text-slate-300">Kapsz egy Game ID-t. Oszd meg a barátokkal, és már jöhet is a csatlakozás.</p>
 
               <button
                 disabled={busy || safeName.trim().length < 2}
@@ -166,8 +183,8 @@ export default function LobbyPage() {
               </button>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20">
-              <h2 className="text-base font-semibold text-slate-100">3) Csatlakozás gameId-val</h2>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20">
+              <h2 className="text-base font-semibold text-slate-100">Csatlakozás Game ID-val</h2>
               <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                 <input
                   className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-400/50"
@@ -211,11 +228,11 @@ export default function LobbyPage() {
 
         {/* Right: running games */}
         <section className="lg:col-span-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-slate-100">Futó játékok</h2>
-                <p className="mt-1 text-sm text-slate-300">Kattints „Folytatás”-ra, ha ez a böngésző már csatlakozott korábban.</p>
+                <p className="mt-1 text-sm text-slate-300">A "Folytatás" akkor jelenik meg, ha ebben a böngészőben már csatlakoztál korábban.</p>
               </div>
               <div className="flex gap-2">
                 <input
@@ -249,22 +266,41 @@ export default function LobbyPage() {
 
               {games.map((g) => {
                 const resumeId = resumeMap[g.gameId] || null
-                const youAreIn = resumeId ? g.players.some((p) => p._id === resumeId) : false
+                const youAreIn = resumeId ? g.players.some((p) => String(p._id) === String(resumeId)) : false
                 const canResume = Boolean(resumeId && youAreIn)
                 return (
                   <div
                     key={g.gameId}
-                    className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                    className="rounded-3xl border border-white/10 bg-black/20 p-4"
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 gap-3">
+                        <div className="hidden shrink-0 sm:block">
+                          <div className="aspect-[4/3] w-32 overflow-hidden rounded-2xl border border-white/10 bg-black/10">
+                            <MapPreview seed={g.gameId} mapType={(g.mapType as any) || 'classic'} className="h-full w-full" compact />
+                          </div>
+                        </div>
+
+                        <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="truncate font-mono text-sm text-slate-100">{g.gameId}</div>
+                          <button
+                            type="button"
+                            className="truncate font-mono text-sm text-slate-100 hover:underline"
+                            onClick={async () => {
+                              try { await navigator.clipboard.writeText(g.gameId) } catch {}
+                            }}
+                            title="Kattints a másoláshoz"
+                          >
+                            {g.gameId}
+                          </button>
                           <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-xs text-slate-200">
                             {phaseLabel(g.phase)}
                           </span>
                           <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-xs text-slate-200">
-                            {g.playerCount}/4 játékos
+                            {g.playerCount}/{g.settings?.maxPlayers ?? 4} játékos
+                          </span>
+                          <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-xs text-slate-200">
+                            Térkép: {mapLabel(g.mapType)}
                           </span>
                           {g.phase !== 'lobby' && (
                             <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-xs text-slate-200">
@@ -294,9 +330,16 @@ export default function LobbyPage() {
                         <div className="mt-2 text-xs text-slate-400">
                           Frissítve: {humanUpdated(g.updatedAt)}
                         </div>
+                        </div>
                       </div>
 
-                      <div className="flex shrink-0 flex-wrap gap-2">
+                      <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                        <div className="hidden sm:block">
+                          <div className="h-24 w-36 overflow-hidden rounded-2xl border border-white/10 bg-black/10">
+                            <MapPreview seed={g.gameId} mapType={(g.mapType as any) ?? 'classic'} className="h-full w-full" compact />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
                         <button
                           className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/15"
                           onClick={async () => {
@@ -344,6 +387,7 @@ export default function LobbyPage() {
                             Csatlakozás
                           </button>
                         )}
+                        </div>
                       </div>
                     </div>
                   </div>

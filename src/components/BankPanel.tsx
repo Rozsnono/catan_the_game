@@ -2,7 +2,7 @@
 
 import React from 'react'
 import type { GameState, Resource } from '@/types/game'
-import Select from './Select';
+import Select from './shared/Select';
 import { HU } from '@/types/translate';
 import { ResourcePill } from './icons'
 

@@ -11,10 +11,7 @@ export default function Dropdown(
         disabled?: boolean;
     }
 ) {
-    const items: Item[] = useMemo(
-        () => props.items,
-        []
-    );
+    const items: Item[] = props.items;
 
     const [open, setOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState<number>(items.map((_, i) => i).indexOf(0));

@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Select from '@/components/Select'
+import Select from '@/components/shared/Select'
 import MapTemplateEditor from '@/components/MapTemplateEditor'
+import MapPreview from '@/components/MapPreview'
+import RangeInput from '@/components/shared/Range'
 
 type MapType = 'classic' | 'large' | 'islands' | 'world' | 'custom'
 
-type MapTemplate = { _id: string; name: string }
+type MapTemplate = { _id: string; name: string; hexes?: { q: number; r: number }[] }
 
 type ListedGame = {
   gameId: string
@@ -67,13 +69,13 @@ export default function Home() {
   const [mapSource, setMapSource] = useState<'preset' | 'template'>('preset')
   const [templateId, setTemplateId] = useState<string | ''>('')
   const [maxVictoryPoints, setMaxVictoryPoints] = useState(10)
-  const [maxPlayers, setMaxPlayers] = useState<2 | 3 | 4>(4)
+  const [maxPlayers, setMaxPlayers] = useState<number>(4)
 
   const [templates, setTemplates] = useState<MapTemplate[]>([])
   async function refreshTemplates() {
     try {
       const data = await getJSON<{ templates: MapTemplate[] }>(`/api/templates`)
-      setTemplates((data.templates ?? []).map((t) => ({ _id: t._id, name: t.name })))
+      setTemplates((data.templates ?? []).map((t) => ({ _id: t._id, name: t.name, hexes: t.hexes })))
     } catch {
       // ignore
     }
@@ -168,7 +170,7 @@ export default function Home() {
                   <div className="text-xs font-semibold text-slate-300">Új játék beállításai</div>
 
                   <div className="grid gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-col justify-center gap-2">
                       <div className="text-xs font-semibold text-slate-300">Térkép forrás</div>
                       <Select
                         label={<span className="font-semibold text-slate-100">{mapSource === 'preset' ? 'Beépített' : 'Saját sablon'}</span>}
@@ -176,83 +178,87 @@ export default function Home() {
                           { label: 'Beépített térképek', onClick: () => setMapSource('preset') },
                           { label: 'Saját sablon (editor)', onClick: () => setMapSource('template') },
                         ]}
-                        className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-100 hover:bg-black/25"
+                        className=""
                         disabled={loading}
                       />
                     </div>
 
                     {mapSource === 'preset' ? (
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="grid gap-2">
                         <div className="text-xs font-semibold text-slate-300">Térkép</div>
-                        <Select
-                          label={
-                            <span className="inline-flex items-center gap-2">
-                              <span className="font-semibold text-slate-100">{mapLabel(mapType)}</span>
-                              <span className="text-xs text-slate-400">választás</span>
-                            </span>
-                          }
-                          items={[
-                            { label: 'Klasszikus (19 hex)', onClick: () => setMapType('classic') },
-                            { label: 'Nagy (37 hex)', onClick: () => setMapType('large') },
-                            { label: 'Szigetek', onClick: () => setMapType('islands') },
-                            { label: 'Világ', onClick: () => setMapType('world') },
-                          ]}
-                          className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-100 hover:bg-black/25"
-                          disabled={loading}
-                        />
+
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          {([
+                            { id: 'classic' as const, title: 'Klasszikus', sub: '19 hex' },
+                            { id: 'large' as const, title: 'Nagy', sub: '37 hex' },
+                            { id: 'islands' as const, title: 'Szigetek', sub: 'szigetes' },
+                            { id: 'world' as const, title: 'Világ', sub: 'világos' },
+                          ]).map((opt) => {
+                            const active = mapType === opt.id
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                disabled={loading}
+                                onClick={() => setMapType(opt.id)}
+                                className={`group rounded-2xl border p-2 text-left transition ${active ? 'border-sky-400/60 bg-sky-500/10' : 'border-white/10 bg-black/10 hover:bg-black/15'}`}
+                              >
+                                <div className="aspect-[4/3] overflow-hidden rounded-xl border border-white/10 bg-black/10">
+                                  <MapPreview seed={`preset:${opt.id}`} mapType={opt.id} className="h-full w-full" compact />
+                                </div>
+                                <div className="mt-2">
+                                  <div className="text-sm font-semibold text-slate-100">{opt.title}</div>
+                                  <div className="text-xs text-slate-400">{opt.sub}</div>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-xs font-semibold text-slate-300">Sablon</div>
-                        <Select
-                          id='template_select'
-                          label={<span className="font-semibold text-slate-100">{templateId ? (templates.find((t) => t._id === templateId)?.name ?? 'Sablon') : 'Válassz sablont'}</span>}
-                          items={templates.length ? templates.map((t) => ({ label: t.name, onClick: () => setTemplateId(t._id) })) : [{ label: 'Nincs sablon még (nyisd meg a Térképszerkesztőt)', onClick: () => { } }]}
-                          className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-100 hover:bg-black/25"
-                          disabled={loading}
-                        />
-                        <button
-                          onClick={refreshTemplates}
-                          className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-black/25"
-                          type="button"
-                        >
-                          Frissítés
-                        </button>
+                      <div className="grid gap-2">
+                        <div className="text-xs font-semibold text-slate-300">Térkép</div>
+
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          {(templates.map((e) => ({ id: e._id, title: e.name, ...e }))).map((opt) => {
+                            const active = templateId === opt.id
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                disabled={loading}
+                                onClick={() => setTemplateId(opt.id)}
+                                className={`group rounded-2xl border p-2 text-left transition ${active ? 'border-sky-400/60 bg-sky-500/10' : 'border-white/10 bg-black/10 hover:bg-black/15'}`}
+                              >
+                                <div className="aspect-[4/3] overflow-hidden rounded-xl border border-white/10 bg-black/10">
+                                  <MapPreview
+                                    seed={opt.id || 'template'}
+                                    mapType="custom"
+                                    templateHexes={templates.find((t) => t._id === opt.id)?.hexes ?? []}
+                                    className="h-full w-full"
+                                    compact
+                                  />
+                                </div>
+                                <div className="mt-2">
+                                  <div className="text-sm font-semibold text-slate-100">{opt.title}</div>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-1">
                     <div>
-                      <div className="mb-1 text-xs font-semibold text-slate-300">Max pont</div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="range"
-                          min={5}
-                          max={20}
-                          value={maxVictoryPoints}
-                          onChange={(e) => setMaxVictoryPoints(parseInt(e.target.value, 10))}
-                          className="w-full"
-                          disabled={loading}
-                        />
-                        <div className="min-w-[2.5rem] rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-center text-sm text-slate-100">
-                          {maxVictoryPoints}
-                        </div>
-                      </div>
+                      <div className="mb-1 text-xs font-semibold text-slate-300">Max győzelmi pont</div>
+                      <RangeInput id="max-victory-points" min={5} max={20} value={maxVictoryPoints} onChange={setMaxVictoryPoints} disabled={loading} />
                     </div>
 
-                    <div>
+                    <div className="flex flex-col justify-center gap-2">
                       <div className="mb-1 text-xs font-semibold text-slate-300">Max játékos</div>
-                      <Select
-                        label={<span className="font-semibold text-slate-100">{maxPlayers}</span>}
-                        items={[
-                          { label: '2 játékos', onClick: () => setMaxPlayers(2) },
-                          { label: '3 játékos', onClick: () => setMaxPlayers(3) },
-                          { label: '4 játékos', onClick: () => setMaxPlayers(4) },
-                        ]}
-                        className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-100 hover:bg-black/25"
-                        disabled={loading}
-                      />
+                      <RangeInput id="max-players" min={2} max={8} value={maxPlayers} onChange={setMaxPlayers} disabled={loading} />
                     </div>
                   </div>
                 </div>
