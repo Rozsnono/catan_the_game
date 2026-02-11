@@ -126,12 +126,12 @@ export default function MapTemplateEditor(props: {
       setSelectedHex({ q, r })
       return
     }
+    setSelectedHex(null);
     if (mode === 'select') {
       setSelectedHex({ q, r })
       return
     }
     setHexes([...hexes, { q, r }]);
-    setSelectedHex({ q, r });
 
   }
 
@@ -388,7 +388,7 @@ export default function MapTemplateEditor(props: {
                 <path
                   key={key(h.q, h.r)}
                   d={d}
-                  fill={isSelected ? 'rgba(56,189,248,.18)' : 'rgba(15,23,42,.28)'}
+                  fill={isSelected ? 'rgba(15, 54, 70, 0.76)' : 'rgba(15,23,42,.80)'}
                   stroke={isSelected ? 'rgba(56,189,248,.65)' : 'rgba(226,232,240,.12)'}
                   strokeWidth={2} />
               )
