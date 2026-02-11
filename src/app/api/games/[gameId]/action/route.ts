@@ -147,7 +147,7 @@ export async function POST(req: Request, { params }: { params: { gameId: string 
       case 'chat': {
 
         const text = z.string().min(1).max(300).parse(body.payload?.text)
-        const p = (game as any).players.find((x: any) => x._id === body.playerId)
+        const p = (game as any).players.find((x: any) => String(x._id) === String(body.playerId))
         const name = p?.name ?? 'Ismeretlen'
         addChat(game as any, name, body.playerId, text)
         break

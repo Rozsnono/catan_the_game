@@ -138,6 +138,8 @@ export type GameState = {
   you?: {
     playerId: string
     name: string
+    victoryCardCount?: number
+    totalVictoryPoints?: number
     resources: Record<Resource, number>
     ports?: {
       threeToOne: boolean

@@ -57,11 +57,10 @@ export function DevCardsPanel({
         c.kind !== 'victory' &&
         isMyTurn &&
         game.phase === 'main' &&
-        Boolean(game.turnHasRolled) &&
         !Boolean(game.devPlayedThisTurn) &&
         (c.boughtTurn ?? 0) < turn,
     }))
-  }, [cards, isMyTurn, game.phase, game.turnHasRolled, game.devPlayedThisTurn, turn])
+  }, [cards, isMyTurn, game.phase, game.devPlayedThisTurn, turn])
 
   const [modal, setModal] = useState<null | { id: string; kind: DevCardKind }>(null)
   const [choice, setChoice] = useState<{ r1?: Resource; r2?: Resource; resource?: Resource }>({})
@@ -88,7 +87,6 @@ export function DevCardsPanel({
   const buyDisabled =
     !isMyTurn ||
     game.phase !== 'main' ||
-    !Boolean(game.turnHasRolled) ||
     !canAffordDev(game) ||
     Number(game.devDeckCount ?? 0) <= 0
 
@@ -113,7 +111,10 @@ export function DevCardsPanel({
 
         {you ? (
           <div className="rounded-xl border border-white/10 bg-black/10 p-3 text-xs text-slate-300">
-            Ingyen utak: <span className="font-semibold text-slate-100">{Number(you.freeRoadsToPlace ?? 0)}</span> • Lovagok: <span className="font-semibold text-slate-100">{Number(you.knightsPlayed ?? 0)}</span>
+            Össz VP (rejtettel): <span className="font-semibold text-slate-100">{Number(you.totalVictoryPoints ?? 0)}</span>
+            {' '}• Rejtett VP kártyák: <span className="font-semibold text-slate-100">{Number(you.victoryCardCount ?? 0)}</span>
+            {' '}• Ingyen utak: <span className="font-semibold text-slate-100">{Number(you.freeRoadsToPlace ?? 0)}</span>
+            {' '}• Lovagok: <span className="font-semibold text-slate-100">{Number(you.knightsPlayed ?? 0)}</span>
           </div>
         ) : null}
       </div>
@@ -131,7 +132,7 @@ export function DevCardsPanel({
                     {(c.boughtTurn ?? 0) < turn ? '' : 'Most vetted — nem játszható ki ebben a körben.'}
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-400">Automatikusan beleszámít a VP-be.</div>
+                  <div className="text-xs text-slate-400">Rejtett VP (csak te látod pontosan).</div>
                 )}
               </div>
 
