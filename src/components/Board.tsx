@@ -44,6 +44,18 @@ export function Board({
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [panZoom, setPanZoom] = useState({ scale: 1, tx: 0, ty: 0 })
+
+  // Touch-first panning / pinch-zoom
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const pinchRef = useRef<null | {
+    startDist: number
+    startScale: number
+    // svg-coords of the midpoint at gesture start
+    midSvg: { x: number; y: number }
+    startTx: number
+    startTy: number
+  }>(null)
+
   const dragRef = useRef<{ active: boolean; pointerId: number | null; start: { x: number; y: number } | null; origin: { tx: number; ty: number } }>(
     { active: false, pointerId: null, start: null, origin: { tx: 0, ty: 0 } }
   )
@@ -60,6 +72,16 @@ export function Board({
     const sp = pt.matrixTransform(inv)
     return { x: sp.x, y: sp.y }
   }, [])
+
+  const robberMoveMode = Boolean((game as any).robber?.pending) && (game as any).robber?.byPlayerId === me && !Boolean((game as any).robber?.awaitingSteal)
+
+  const isMyTurn = game.currentPlayerId === me
+  const canPlaceSettlement = game.phase === 'setup' && isMyTurn && game.setupStep === 'place_settlement'
+  const canPlaceRoad = game.phase === 'setup' && isMyTurn && game.setupStep === 'place_road'
+  const canBuildInMain = game.phase === 'main' && isMyTurn
+  const canBuildRoad = canBuildInMain && buildMode === 'road'
+  const canBuildSettlement = canBuildInMain && buildMode === 'settlement'
+  const canBuildCity = canBuildInMain && buildMode === 'city'
 
   const onWheel = useCallback((e: WheelEvent<SVGSVGElement>) => {
     e.preventDefault()
@@ -81,20 +103,89 @@ export function Board({
   }, [clientToSvg])
 
   const onPointerDown = useCallback((e: PointerEvent<SVGSVGElement>) => {
-    // Pan only with SHIFT + drag (so it doesn't break build/click interactions)
+    let svg = svgRef.current
+    if (!svg) return
+
+    // Touch UX:
+    // - In build/setup/robber-move modes we prefer taps (so we don't steal the gesture).
+    // - Otherwise allow 1-finger pan, and 2-finger pinch zoom.
+    const isTouch = e.pointerType === 'touch'
+    const p = clientToSvg(e.clientX, e.clientY)
+
+    if (isTouch) {
+      try { svg.setPointerCapture(e.pointerId) } catch { }
+      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+      const active = pointersRef.current
+      const list = Array.from(active.values())
+
+      // Start pinch if 2 pointers are down.
+      if (list.length === 2) {
+        const dx = list[0].x - list[1].x
+        const dy = list[0].y - list[1].y
+        const dist = Math.hypot(dx, dy)
+        const midClient = { x: (list[0].x + list[1].x) / 2, y: (list[0].y + list[1].y) / 2 }
+        const midSvg = clientToSvg(midClient.x, midClient.y)
+        pinchRef.current = {
+          startDist: dist || 1,
+          startScale: panZoom.scale,
+          midSvg,
+          startTx: panZoom.tx,
+          startTy: panZoom.ty,
+        }
+        dragRef.current.active = false
+        return
+      }
+
+      // 1-finger pan only when NOT in an interaction mode.
+      if (robberMoveMode || canPlaceSettlement || canPlaceRoad || canBuildRoad || canBuildSettlement || canBuildCity) {
+        return
+      }
+
+      dragRef.current.active = true
+      dragRef.current.pointerId = e.pointerId
+      dragRef.current.start = p
+      dragRef.current.origin = { tx: panZoom.tx, ty: panZoom.ty }
+      return
+    }
+
+    // Mouse/trackpad UX: Pan only with SHIFT + drag (so it doesn't break build/click interactions)
     if (e.button !== 0 || !e.shiftKey) return
-    const svg = svgRef.current
+    svg = svgRef.current
     if (!svg) return
     try { svg.setPointerCapture(e.pointerId) } catch { }
 
-    const p = clientToSvg(e.clientX, e.clientY)
     dragRef.current.active = true
     dragRef.current.pointerId = e.pointerId
     dragRef.current.start = p
     dragRef.current.origin = { tx: panZoom.tx, ty: panZoom.ty }
-  }, [clientToSvg, panZoom.tx, panZoom.ty])
+  }, [clientToSvg, panZoom.scale, panZoom.tx, panZoom.ty, robberMoveMode, canPlaceSettlement, canPlaceRoad, canBuildRoad, canBuildSettlement, canBuildCity])
 
   const onPointerMove = useCallback((e: PointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === 'touch') {
+      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      const active = pointersRef.current
+      const list = Array.from(active.values())
+      if (list.length === 2 && pinchRef.current) {
+        const dx = list[0].x - list[1].x
+        const dy = list[0].y - list[1].y
+        const dist = Math.hypot(dx, dy) || 1
+        const ratio = dist / pinchRef.current.startDist
+
+        const nextScale = Math.min(3, Math.max(0.5, pinchRef.current.startScale * ratio))
+
+        // Keep the midpoint fixed in svg coordinates.
+        const mid = pinchRef.current.midSvg
+        // model point under midpoint at gesture start
+        const px = (mid.x - pinchRef.current.startTx) / pinchRef.current.startScale
+        const py = (mid.y - pinchRef.current.startTy) / pinchRef.current.startScale
+        const nextTx = mid.x - px * nextScale
+        const nextTy = mid.y - py * nextScale
+        setPanZoom({ scale: nextScale, tx: nextTx, ty: nextTy })
+        return
+      }
+    }
+
     if (!dragRef.current.active) return
     if (dragRef.current.pointerId !== e.pointerId) return
     const start = dragRef.current.start
@@ -107,6 +198,10 @@ export function Board({
   }, [clientToSvg])
 
   const endDrag = useCallback((e: PointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === 'touch') {
+      pointersRef.current.delete(e.pointerId)
+      if (pointersRef.current.size < 2) pinchRef.current = null
+    }
     if (!dragRef.current.active) return
     dragRef.current.active = false
     dragRef.current.pointerId = null
@@ -116,8 +211,6 @@ export function Board({
       try { svg.releasePointerCapture(e.pointerId) } catch { }
     }
   }, [])
-
-  const robberMoveMode = Boolean((game as any).robber?.pending) && (game as any).robber?.byPlayerId === me && !Boolean((game as any).robber?.awaitingSteal)
 
   const size = 48 // base hex size in px (SVG units)
   const graph = useMemo(() => buildGraphFromTiles(game.tiles, size), [game.tiles])
@@ -175,15 +268,6 @@ export function Board({
     return m
   }, [game.players])
 
-  const isMyTurn = game.currentPlayerId === me
-  const canPlaceSettlement = game.phase === 'setup' && isMyTurn && game.setupStep === 'place_settlement'
-  const canPlaceRoad = game.phase === 'setup' && isMyTurn && game.setupStep === 'place_road'
-
-  const canBuildInMain = game.phase === 'main' && isMyTurn
-  const canBuildRoad = canBuildInMain && buildMode === 'road'
-  const canBuildSettlement = canBuildInMain && buildMode === 'settlement'
-  const canBuildCity = canBuildInMain && buildMode === 'city'
-
   const extents = useMemo(() => {
     // During first render, the game state might not be loaded yet.
     // Guard against empty arrays so we never emit an invalid viewBox (Infinity/NaN).
@@ -205,7 +289,53 @@ export function Board({
     <section className="rounded-2xl border border-white/10 bg-white/5 p-2 shadow-xl shadow-black/20 md:p-3">
       <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black/10">
         <div className="pointer-events-none absolute right-2 top-2 rounded-lg bg-black/40 px-2 py-1 text-[11px] text-white/80">
-          Zoom: görgő • Mozgatás: <span className="font-semibold">Shift</span> + húzás
+          Zoom: görgő / csippentés • Mozgatás: Shift+húzás / húzás
+        </div>
+
+        {/* Touch-friendly zoom controls */}
+        <div className="absolute left-2 top-2 z-10 flex flex-col gap-2">
+          <button
+            className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 hover:bg-slate-950/80"
+            onClick={() =>
+              setPanZoom((v) => {
+                const nextScale = Math.min(3, v.scale * 1.12)
+                const cx = boardCenter.x
+                const cy = boardCenter.y
+                const px = (cx - v.tx) / v.scale
+                const py = (cy - v.ty) / v.scale
+                return { scale: nextScale, tx: cx - px * nextScale, ty: cy - py * nextScale }
+              })
+            }
+            title="Nagyítás"
+            type="button"
+          >
+            +
+          </button>
+          <button
+            className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 hover:bg-slate-950/80"
+            onClick={() =>
+              setPanZoom((v) => {
+                const nextScale = Math.max(0.5, v.scale * 0.9)
+                const cx = boardCenter.x
+                const cy = boardCenter.y
+                const px = (cx - v.tx) / v.scale
+                const py = (cy - v.ty) / v.scale
+                return { scale: nextScale, tx: cx - px * nextScale, ty: cy - py * nextScale }
+              })
+            }
+            title="Kicsinyítés"
+            type="button"
+          >
+            −
+          </button>
+          <button
+            className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-[11px] text-slate-200 hover:bg-slate-950/80"
+            onClick={() => setPanZoom({ scale: 1, tx: 0, ty: 0 })}
+            title="Alaphelyzet"
+            type="button"
+          >
+            reset
+          </button>
         </div>
         <svg
           ref={svgRef}
@@ -217,7 +347,7 @@ export function Board({
           onPointerLeave={endDrag}
           style={{ touchAction: 'none' }}
           viewBox={`${extents.minX} ${extents.minY} ${extents.w} ${extents.h}`}
-          className="h-[55vh] w-full min-h-[380px] select-none md:h-[62vh] lg:h-[68vh]"
+          className="h-[52vh] w-full min-h-[320px] select-none md:h-[62vh] lg:h-[68vh]"
           role="img"
           aria-label="Catan tábla"
         >
