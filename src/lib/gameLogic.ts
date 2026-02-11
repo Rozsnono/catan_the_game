@@ -62,6 +62,11 @@ function ensureDevFields(game: GameDoc) {
   if ((game as any).largestArmyPlayerId === undefined) (game as any).largestArmyPlayerId = null
 }
 
+function ensureLongestRoadFields(game: GameDoc) {
+  if ((game as any).longestRoadPlayerId === undefined) (game as any).longestRoadPlayerId = null
+  if (typeof (game as any).longestRoadLength !== 'number') (game as any).longestRoadLength = 0
+}
+
 
 function ensureRobberFields(game: GameDoc) {
   if (!(game as any).robber) {
@@ -477,6 +482,136 @@ export function addChat(game: GameDoc, name: string, playerId: string | null, te
   if (game.chat.length > 200) game.chat = game.chat.slice(-200)
 }
 
+function edgeKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+function computeLongestRoadForPlayer(game: GameDoc, playerId: string): number {
+  const graph = buildGraphFromTiles(game.tiles as any, 48)
+
+  const ownedEdgeIds = new Set(
+    game.edges.filter((e: any) => idEq(e.playerId, playerId)).map((e: any) => String(e.edgeId))
+  )
+
+  // Build adjacency only from owned edges.
+  const adj = new Map<string, string[]>()
+  for (const edgeId of ownedEdgeIds) {
+    const en = graph.edgeNodes[edgeId]
+    if (!en) continue
+    const { a, b } = en
+    if (!adj.has(a)) adj.set(a, [])
+    if (!adj.has(b)) adj.set(b, [])
+    adj.get(a)!.push(b)
+    adj.get(b)!.push(a)
+  }
+
+  if (adj.size === 0) return 0
+
+  // Nodes that are occupied by an opponent settlement/city block traversal.
+  const blocked = new Set<string>()
+  for (const n of game.nodes as any[]) {
+    if (!idEq(n.playerId, playerId)) blocked.add(String(n.nodeId))
+  }
+
+  let best = 0
+
+  function dfs(u: string, used: Set<string>, length: number) {
+    if (length > best) best = length
+    // You can end at a blocked node, but cannot pass through it.
+    if (blocked.has(u)) return
+    const neigh = adj.get(u) ?? []
+    for (const v of neigh) {
+      const k = edgeKey(u, v)
+      if (used.has(k)) continue
+      used.add(k)
+      dfs(v, used, length + 1)
+      used.delete(k)
+    }
+  }
+
+  for (const start of adj.keys()) {
+    dfs(start, new Set(), 0)
+  }
+
+  return best
+}
+
+function recomputeLongestRoadAward(game: GameDoc) {
+  ensureLongestRoadFields(game)
+
+  const minLength = 5
+  const prevHolder = (game as any).longestRoadPlayerId ? String((game as any).longestRoadPlayerId) : null
+  const prevLen = Number((game as any).longestRoadLength ?? 0)
+
+  // IMPORTANT: make award idempotent (no point stacking).
+  // First, remove any previously-applied longest-road bonus from whoever had it.
+  for (const p of game.players as any[]) {
+    if (p.longestRoadAward) {
+      p.victoryPoints = Math.max(0, Number(p.victoryPoints ?? 0) - 2)
+      p.longestRoadAward = false
+    }
+  }
+
+  // Compute current best lengths
+  const lengths = game.players.map((p: any) => ({
+    playerId: asId(p._id),
+    len: computeLongestRoadForPlayer(game, asId(p._id)),
+  }))
+
+  const bestLen = Math.max(0, ...lengths.map((x) => x.len))
+  const bestPlayers = lengths.filter((x) => x.len === bestLen).map((x) => x.playerId)
+
+  // Nobody qualifies
+  if (bestLen < minLength) {
+    ;(game as any).longestRoadPlayerId = null
+    ;(game as any).longestRoadLength = 0
+    return
+  }
+
+  let finalHolder: string | null = null
+  let finalLen = bestLen
+
+  // Tie handling:
+  // - If there's a current holder and they are among tied best, keep.
+  // - If there's a current holder not among tied best, keep (award doesn't change on tie).
+  // - If no holder and tie, no award is granted.
+  if (bestPlayers.length > 1) {
+    if (prevHolder) {
+      finalHolder = prevHolder
+      finalLen = Math.max(prevLen, bestLen)
+    } else {
+      finalHolder = null
+      finalLen = bestLen
+    }
+  } else {
+    const winnerId = bestPlayers[0]
+
+    if (prevHolder && idEq(prevHolder, winnerId)) {
+      finalHolder = winnerId
+      finalLen = bestLen
+    } else if (prevHolder && bestLen <= prevLen) {
+      // Not strictly greater than previous record -> keep previous holder
+      finalHolder = prevHolder
+      finalLen = Math.max(prevLen, bestLen)
+    } else {
+      finalHolder = winnerId
+      finalLen = bestLen
+    }
+  }
+
+  ;(game as any).longestRoadPlayerId = finalHolder
+  ;(game as any).longestRoadLength = finalLen
+
+  if (finalHolder) {
+    const holder: any = game.players.find((p: any) => idEq(p._id, finalHolder))
+    if (holder) {
+      holder.victoryPoints = Number(holder.victoryPoints ?? 0) + 2
+      holder.longestRoadAward = true
+    }
+  }
+}
+
+
 export function addPlayer(game: GameDoc, name: string): string {
   const maxPlayers = (game as any).settings?.maxPlayers ?? 4
   if (game.players.length >= maxPlayers) throw new Error(`A játék tele van (max ${maxPlayers} játékos).`)
@@ -531,6 +666,7 @@ export async function startIfPossible(game: GameDoc) {
   game.currentPlayerId = game.players[0]._id
     ; (game as any).turnHasRolled = false
   ensureDevFields(game)
+  ensureLongestRoadFields(game)
     ; (game as any).turnNumber = 1
     ; (game as any).devDeck = makeDevDeck(game._id)
     ; (game as any).devPlayedThisTurn = false
@@ -562,6 +698,7 @@ export function placeSettlement(game: GameDoc, playerId: string, nodeId: string)
   maybeGrantPort(game, playerId, nodeId)
   p.settlements += 1
   p.victoryPoints += 1
+  recomputeLongestRoadAward(game)
 
   // Classic Catan rule: after placing your SECOND settlement in setup,
   // you immediately receive starting resources from adjacent hexes.
@@ -686,6 +823,7 @@ export function buildRoad(game: GameDoc, playerId: string, edgeId: string) {
 
   game.edges.push({ edgeId, playerId })
   p.roads += 1
+  recomputeLongestRoadAward(game)
 }
 
 export function buildSettlement(game: GameDoc, playerId: string, nodeId: string) {
@@ -698,6 +836,7 @@ export function buildSettlement(game: GameDoc, playerId: string, nodeId: string)
   game.nodes.push({ nodeId, playerId, kind: 'settlement' })
   p.settlements += 1
   p.victoryPoints += 1
+  recomputeLongestRoadAward(game)
   ensurePortsShape(p as any)
   maybeGrantPort(game, playerId, nodeId)
   addLog(game, `${p.name} települést épített. (-1 fa, -1 tégla, -1 búza, -1 juh)`)
@@ -715,6 +854,7 @@ export function buildCity(game: GameDoc, playerId: string, nodeId: string) {
   p.cities += 1
   p.settlements = Math.max(0, p.settlements - 1)
   p.victoryPoints += 1 // settlement already counted 1
+  recomputeLongestRoadAward(game)
   addLog(game, `${p.name} várossá fejlesztett. (-2 búza, -3 érc)`)
 }
 
@@ -735,6 +875,7 @@ export function placeRoad(game: GameDoc, playerId: string, edgeId: string) {
   game.edges.push({ edgeId, playerId })
   const p = game.players.find((x) => idEq(x._id, playerId))!
   p.roads += 1
+  recomputeLongestRoadAward(game)
   addLog(game, `${p.name} utat rakott.`)
 
   // Mark setup progress
@@ -1049,6 +1190,8 @@ export function tradeWithBank(game: GameDoc, playerId: string, give: Resource, g
 }
 
 export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
+  ensureDevFields(game)
+  ensureLongestRoadFields(game)
   const players = game.players.map((p) => ({
     _id: asId(p._id),
     name: p.name,
@@ -1120,6 +1263,8 @@ export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
     devPlayedThisTurn: (game as any).devPlayedThisTurn ?? false,
     largestArmyPlayerId: (game as any).largestArmyPlayerId ?? null,
     largestArmySize: Number((game as any).largestArmySize ?? 0),
+    longestRoadPlayerId: (game as any).longestRoadPlayerId ?? null,
+    longestRoadLength: Number((game as any).longestRoadLength ?? 0),
     robber: (() => {
       ensureRobberFields(game)
       const r = (game as any).robber

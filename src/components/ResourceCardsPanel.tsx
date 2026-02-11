@@ -1,7 +1,7 @@
 'use client'
 
 import type { GameState, Resource } from '@/types/game'
-import { LargestArmyIcon, ResourceIcon, RoadIcon } from './icons'
+import { LargestArmyIcon, LongestRoadIcon, ResourceIcon, RoadIcon, TrophyIcon } from './icons'
 
 const order: { key: Resource; label: string; pattern: string }[] = [
   { key: 'wood', label: 'Fa', pattern: 'p_wood' },
@@ -64,8 +64,10 @@ export function ResourceCardsPanel({ game }: { game: GameState }) {
     <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl shadow-black/20">
       <div className="mb-3 flex items-end justify-between gap-3">
         <h3 className="text-sm font-semibold text-slate-100">Kártyáid</h3>
-        <div className="text-xs text-slate-500">
-          {r ? 'Publikus: csak a sajátod' : 'Betöltés…'}
+        <div className="text-xs text-slate-200">
+          {r ? 
+            <span className='flex items-center justify-end gap-1'><TrophyIcon /> { game.players.find(p => p._id === game.you?.playerId)?.victoryPoints ?? 0} VP</span>
+          : 'Betöltés…'}
         </div>
       </div>
 
@@ -91,7 +93,7 @@ export function ResourceCardsPanel({ game }: { game: GameState }) {
         ))}
 
         {
-          game.largestArmyPlayerId === game.you?.playerId || true && (
+          game.largestArmyPlayerId === game.you?.playerId && (
             <div
               className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-3"
             >
@@ -103,7 +105,7 @@ export function ResourceCardsPanel({ game }: { game: GameState }) {
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-slate-100">Legnagyobb hadsereg</div>
-                <div className="mt-0.5 text-xs text-slate-400">
+                <div className="mt-0.5 text-xs text-slate-100 p-1 px-3 rounded-full bg-green-500/30 inline-block">
                   +2 VP
                 </div>
               </div>
@@ -112,19 +114,19 @@ export function ResourceCardsPanel({ game }: { game: GameState }) {
         }
 
         {
-          game.largestArmyPlayerId === game.you?.playerId || true && (
+          game.longestRoadPlayerId === game.you?.playerId && (
             <div
               className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-3"
             >
               <div className="relative">
                 <HexIcon patternId={''} />
                 <div className="absolute inset-0 flex items-center justify-center text-slate-100">
-                  <LargestArmyIcon className="h-6 w-6 opacity-90" />
+                  <LongestRoadIcon className="h-6 w-6 opacity-90" />
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-100">Legnagyobb hadsereg</div>
-                <div className="mt-0.5 text-xs text-slate-400">
+                <div className="text-sm font-semibold text-slate-100">Leghosszabb út</div>
+                <div className="mt-0.5 text-xs text-slate-100 p-1 px-3 rounded-full bg-green-500/30 inline-block">
                   +2 VP
                 </div>
               </div>

@@ -377,7 +377,6 @@ export default function MapTemplateEditor(props: {
               </pattern>
             </defs>
 
-            <rect x={extents.minX} y={extents.minY} width={extents.w} height={extents.h} fill="url(#g_ocean_editor)" />
             <rect x={extents.minX} y={extents.minY} width={extents.w} height={extents.h} fill="url(#p_waves_editor)" opacity={0.85} />
 
             {hexes.map((h) => {

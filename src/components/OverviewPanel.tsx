@@ -57,7 +57,7 @@ export function OverviewPanel({
           <TradePanel
             game={game}
             me={me}
-            onCreate={onTradeCreate}
+            onCreate={onTradeCreate as any}
             onAccept={onTradeAccept}
             onReject={onTradeReject}
             onCancel={onTradeCancel}

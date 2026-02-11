@@ -123,6 +123,8 @@ export type GameState = {
   devPlayedThisTurn?: boolean
   largestArmyPlayerId?: string | null
   largestArmySize?: number
+  longestRoadPlayerId?: string | null
+  longestRoadLength?: number
 
   robber?: {
     pending: boolean

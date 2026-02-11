@@ -50,6 +50,7 @@ const PlayerSchema = new Schema(
     devCards: { type: [DevCardSchema], default: [] },
     knightsPlayed: { type: Number, default: 0 },
     freeRoadsToPlace: { type: Number, default: 0 },
+    longestRoadAward: { type: Boolean, default: false },
   },
   { _id: false }
 )
@@ -170,6 +171,9 @@ const GameSchema = new Schema(
     devPlayedThisTurn: { type: Boolean, default: false },
     largestArmyPlayerId: { type: String, default: null },
     largestArmySize: { type: Number, default: 0 },
+
+    longestRoadPlayerId: { type: String, default: null },
+    longestRoadLength: { type: Number, default: 0 },
 
     robber: {
       pending: { type: Boolean, default: false },
