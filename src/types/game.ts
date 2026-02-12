@@ -116,6 +116,16 @@ export type GameState = {
     sum: number
   } | null
 
+  // End-of-game
+  winnerPlayerId?: string | null
+  finishedAt?: string | null
+
+  // Statistics
+  stats?: {
+    rollCounts: Record<string, number> // "2".."12"
+    resourceGains: Record<string, Record<Resource, number>> // playerId -> resources gained
+  }
+
   // main phase convenience
   turnHasRolled?: boolean
   turnNumber?: number
@@ -138,8 +148,6 @@ export type GameState = {
   you?: {
     playerId: string
     name: string
-    victoryCardCount?: number
-    totalVictoryPoints?: number
     resources: Record<Resource, number>
     ports?: {
       threeToOne: boolean

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MapTemplate, MapTemplatePortKind } from '@/types/game'
-import Select from '@/components/shared/Select'
+import Select from '@/components/Select'
 import { axialToPixel, hexCorners } from '@/lib/shared/boardGeometry'
 
 type EditorMode = 'add' | 'erase' | 'select';

@@ -126,6 +126,16 @@ const TradeLineSchema = new Schema(
   { _id: false }
 )
 
+const StatsSchema = new Schema(
+  {
+    // Keys are stringified numbers: "2".."12"
+    rollCounts: { type: Map, of: Number, default: {} },
+    // playerId -> { wood, brick, wheat, sheep, ore }
+    resourceGains: { type: Map, of: TradeLineSchema, default: {} },
+  },
+  { _id: false }
+)
+
 const TradeOfferSchema = new Schema(
   {
     id: { type: String, required: true },
@@ -161,6 +171,13 @@ const GameSchema = new Schema(
     log: { type: [LogSchema], default: [] },
     chat: { type: [ChatSchema], default: [] },
     lastRoll: { type: LastRollSchema, default: null },
+
+    // Game statistics
+    stats: { type: StatsSchema, default: {} },
+
+    // End-of-game
+    winnerPlayerId: { type: String, default: null },
+    finishedAt: { type: Date, default: null },
 
     tradeOffers: { type: [TradeOfferSchema], default: [] },
 

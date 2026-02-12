@@ -111,20 +111,19 @@ function randomStealResource(from: any): Resource | null {
 }
 
 function stealHalfResources(game: GameDoc) {
-  for (const from of game.players as any[]) {
-    const total = Object.values(from.resources ?? {}).reduce((a: number, b: any) => a + Number(b ?? 0), 0)
-    if (total <= 7) continue
-
-    addLog(
-      game,
-      `${from.name} túl sok erőforrással rendelkezik (${total}), ezért a rabló miatt elveszíti a felét (kerekítve lefelé).`
-    )
-
-    const toSteal = Math.floor(total / 2)
+  const allPlayers = game.players;
+  for (const player of allPlayers) {
+    const from = player;
+    if (!from) break;
+    const total = Object.values(from.resources ?? {}).reduce((a, b) => a + Number(b), 0);
+    if (total > 7) addLog(game, `${from.name} túl sok erőforrással rendelkezik (${total}), ezért a rabló miatt elveszíti a felét (kerekítve lefelé).`)
+    else break;
+    const toSteal = Math.floor(total / 2) >= 7 ? total - 7 : Math.floor(total / 2);
+    if (toSteal <= 0) break;
     for (let i = 0; i < toSteal; i++) {
-      const res = randomStealResource(from)
-      if (!res) break
-      from.resources![res] = (from.resources![res] ?? 0) - 1
+      const res = randomStealResource(from);
+      if (!res) break;
+      from.resources![res] = (from.resources![res] ?? 0) - 1;
     }
   }
 }
@@ -680,14 +679,6 @@ function requireTurn(game: GameDoc, playerId: string) {
   if (game.currentPlayerId !== playerId) throw new Error('Nem te jössz.')
 }
 
-function requireRobberResolved(game: GameDoc, playerId: string) {
-  ensureRobberFields(game)
-  const r = (game as any).robber
-  if (r?.pending && String(r.byPlayerId ?? '') === String(playerId)) {
-    throw new Error('Előbb fejezd be a rabló lépést (mezőválasztás + rablás).')
-  }
-}
-
 export function placeSettlement(game: GameDoc, playerId: string, nodeId: string) {
   if (game.phase !== 'setup') throw new Error('Települést most csak setup fázisban lehet lerakni (MVP).')
   if (game.setupStep !== 'place_settlement') throw new Error('Most út lerakása következik.')
@@ -740,6 +731,51 @@ export function placeSettlement(game: GameDoc, playerId: string, nodeId: string)
 
 type Cost = Partial<Record<Resource, number>>
 
+function emptyResourceLine(): Record<Resource, number> {
+  return { wood: 0, brick: 0, wheat: 0, sheep: 0, ore: 0 }
+}
+
+function ensureStatsFields(game: GameDoc) {
+  const stats = ((game as any).stats = (game as any).stats ?? {})
+  stats.rollCounts = stats.rollCounts ?? new Map()
+  stats.resourceGains = stats.resourceGains ?? new Map()
+}
+
+function incRollCount(game: GameDoc, sum: number) {
+  ensureStatsFields(game)
+  const m: Map<string, number> = (game as any).stats.rollCounts
+  const key = String(sum)
+  m.set(key, Number(m.get(key) ?? 0) + 1)
+}
+
+function addResourceGain(game: GameDoc, playerId: string, gain: Partial<Record<Resource, number>>) {
+  ensureStatsFields(game)
+  const m: Map<string, Record<Resource, number>> = (game as any).stats.resourceGains
+  const cur = m.get(playerId) ?? emptyResourceLine()
+  for (const [k, v] of Object.entries(gain) as [Resource, number][]) {
+    if (!v) continue
+    cur[k] = Number(cur[k] ?? 0) + Number(v)
+  }
+  m.set(playerId, cur)
+}
+
+export function maybeFinishGame(game: GameDoc) {
+  if (game.phase !== 'main') return
+  if (game.phase === 'finished') return
+  const maxVP = Number((game as any).settings?.maxVictoryPoints ?? 10)
+  const winners = (game.players as any[]).filter((p) => Number(p.victoryPoints ?? 0) >= maxVP)
+  if (!winners.length) return
+
+  // If multiple players reach the goal simultaneously, the current player wins.
+  let winner: any = winners.find((p) => String(p._id) === String(game.currentPlayerId))
+  if (!winner) winner = winners[0]
+
+  game.phase = 'finished'
+  ;(game as any).winnerPlayerId = String(winner._id)
+  ;(game as any).finishedAt = new Date()
+  addLog(game, `🏁 Játék vége! Győztes: ${winner.name} (${winner.victoryPoints} pont).`)
+}
+
 const COSTS: Record<'road' | 'settlement' | 'city', Cost> = {
   road: { wood: 1, brick: 1 },
   settlement: { wood: 1, brick: 1, wheat: 1, sheep: 1 },
@@ -776,23 +812,13 @@ function canBuildRoadAtEdge(game: GameDoc, playerId: string, edgeId: string) {
   const en = graph.edgeNodes[edgeId]
   if (!en) throw new Error('Érvénytelen él.')
 
-  const nodeBlocked = (nodeId: string) =>
-    game.nodes.some((n) => n.nodeId === nodeId && !idEq(n.playerId, playerId))
-
   // Must connect to your existing road or settlement/city.
-  const touchesOwnSettlement = game.nodes.some(
-    (n) => idEq(n.playerId, playerId) && (n.nodeId === en.a || n.nodeId === en.b)
-  )
+  const touchesOwnSettlement = game.nodes.some((n) => n.playerId === playerId && (n.nodeId === en.a || n.nodeId === en.b))
   const touchesOwnRoad = game.edges.some((e) => {
     if (e.playerId !== playerId) return false
     const other = graph.edgeNodes[e.edgeId]
     if (!other) return false
-    // A másik játékos települése/városa megszakítja az úthálózatot: nem lehet "átmenni" rajta.
-    const sharesA = other.a === en.a || other.b === en.a
-    const sharesB = other.a === en.b || other.b === en.b
-    if (sharesA && !nodeBlocked(en.a)) return true
-    if (sharesB && !nodeBlocked(en.b)) return true
-    return false
+    return other.a === en.a || other.b === en.a || other.a === en.b || other.b === en.b
   })
 
   if (!touchesOwnSettlement && !touchesOwnRoad) {
@@ -823,11 +849,8 @@ function canUpgradeToCity(game: GameDoc, playerId: string, nodeId: string) {
 export function buildRoad(game: GameDoc, playerId: string, edgeId: string) {
   if (game.phase !== 'main') throw new Error('Utat most csak a fő játékban lehet építeni.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   const p: any = game.players.find((x) => idEq(x._id, playerId))!
   ensurePlayerDev(p)
-
-  if (Number(p.roads ?? 0) >= 15) throw new Error('Elfogyott az út bábud (max 15).')
 
   const hasFree = Number(p.freeRoadsToPlace ?? 0) > 0
   if (!hasFree) {
@@ -851,10 +874,7 @@ export function buildRoad(game: GameDoc, playerId: string, edgeId: string) {
 export function buildSettlement(game: GameDoc, playerId: string, nodeId: string) {
   if (game.phase !== 'main') throw new Error('Települést most csak a fő játékban lehet építeni.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   const p = game.players.find((x) => idEq(x._id, playerId))!
-
-  if (Number((p as any).settlements ?? 0) >= 5) throw new Error('Elfogyott a település bábud (max 5).')
   requireResources(p as any, COSTS.settlement)
   canBuildSettlementAtNode(game, playerId, nodeId)
   payResources(p as any, COSTS.settlement)
@@ -870,10 +890,7 @@ export function buildSettlement(game: GameDoc, playerId: string, nodeId: string)
 export function buildCity(game: GameDoc, playerId: string, nodeId: string) {
   if (game.phase !== 'main') throw new Error('Várost most csak a fő játékban lehet építeni.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   const p = game.players.find((x) => idEq(x._id, playerId))!
-
-  if (Number((p as any).cities ?? 0) >= 4) throw new Error('Elfogyott a város bábud (max 4).')
   requireResources(p as any, COSTS.city)
   canUpgradeToCity(game, playerId, nodeId)
   payResources(p as any, COSTS.city)
@@ -960,7 +977,6 @@ export function placeRoad(game: GameDoc, playerId: string, edgeId: string) {
 export function rollDice(game: GameDoc, playerId: string) {
   if (game.phase !== 'main') throw new Error('Dobni csak a fő játékban lehet.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   if ((game as any).turnHasRolled) throw new Error('Ebben a körben már dobtál.')
   const d1 = 1 + Math.floor(Math.random() * 6)
   const d2 = 1 + Math.floor(Math.random() * 6)
@@ -969,6 +985,9 @@ export function rollDice(game: GameDoc, playerId: string) {
     ; (game as any).lastRoll = { ts: new Date(), playerId, d1, d2, sum }
     ; (game as any).turnHasRolled = true
   addLog(game, `${p.name} dobott: ${sum} (${d1}+${d2}).`)
+
+  // Stats
+  incRollCount(game, sum)
 
   // Resource distribution (sum != 7)
   if (sum === 7) {
@@ -1002,6 +1021,11 @@ export function rollDice(game: GameDoc, playerId: string) {
     }
   }
 
+  // Stats: resource gains from dice payouts
+  for (const [pid, byRes] of Object.entries(payouts)) {
+    addResourceGain(game, pid, byRes as any)
+  }
+
   const parts: string[] = []
   for (const [pid, byRes] of Object.entries(payouts)) {
     const name = game.players.find((x) => x._id === pid)?.name ?? pid
@@ -1018,15 +1042,7 @@ export function rollDice(game: GameDoc, playerId: string) {
 export function endTurn(game: GameDoc, playerId: string) {
   if (game.phase !== 'main') throw new Error('Kör vége csak a fő játékban.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   ensureDevFields(game)
-
-  // Road Building dev card: if you don't place your free roads this turn,
-  // you lose any remaining free road placements.
-  const cur: any = (game.players as any[]).find((x) => idEq(x._id, playerId))
-  if (cur && Number(cur.freeRoadsToPlace ?? 0) > 0) {
-    cur.freeRoadsToPlace = 0
-  }
 
   const idx = game.players.findIndex((pl) => idEq(pl._id, playerId))
   const nextIdx = (idx + 1) % game.players.length
@@ -1042,10 +1058,10 @@ export function endTurn(game: GameDoc, playerId: string) {
 export function buyDevCard(game: GameDoc, playerId: string) {
   if (game.phase !== 'main') throw new Error('Fejlesztési kártyát csak a fő játékban lehet venni.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   ensureDevFields(game)
   const p: any = game.players.find((x) => idEq(x._id, playerId))!
   ensurePlayerDev(p)
+  if (!(game as any).turnHasRolled) throw new Error('Előbb dobj.')
   const deck: DevCardKind[] = (game as any).devDeck ?? []
   if (deck.length <= 0) throw new Error('Elfogyott a fejlesztési pakli.')
   requireResources(p, { wheat: 1, sheep: 1, ore: 1 } as any)
@@ -1055,9 +1071,8 @@ export function buyDevCard(game: GameDoc, playerId: string) {
   p.devCards.push(card)
 
   if (kind === 'victory') {
-    // Victory Point cards are hidden in standard Catan until revealed at game end.
-    // We keep them in devCards and count them only for the owning player.
-    addLog(game, `${p.name} fejlesztési kártyát vett. (Győzelmi pont - rejtett)`)
+    p.victoryPoints += 1
+    addLog(game, `${p.name} fejlesztési kártyát vett. (+1 VP)`)
   } else {
     addLog(game, `${p.name} fejlesztési kártyát vett.`)
   }
@@ -1072,10 +1087,10 @@ function takeAllOfResource(from: any, res: Resource): number {
 export function playDevCard(game: GameDoc, playerId: string, cardId: string, payload?: any) {
   if (game.phase !== 'main') throw new Error('Fejlesztési kártyát csak a fő játékban lehet kijátszani.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   ensureDevFields(game)
   const p: any = game.players.find((x) => idEq(x._id, playerId))!
   ensurePlayerDev(p)
+  if (!(game as any).turnHasRolled) throw new Error('Előbb dobj.')
   if ((game as any).devPlayedThisTurn) throw new Error('Ebben a körben már játszottál ki fejlesztési kártyát.')
 
   const turn = Number((game as any).turnNumber ?? 1)
@@ -1210,7 +1225,6 @@ export function robberSteal(game: GameDoc, playerId: string, targetPlayerId: str
 export function tradeWithBank(game: GameDoc, playerId: string, give: Resource, get: Resource) {
   if (game.phase !== 'main') throw new Error('Bank csere csak a fő játékban.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   if (give === get) throw new Error('Ugyanarra az erőforrásra nem cserélhetsz.')
   const p = game.players.find((x) => idEq(x._id, playerId))!
   ensurePortsShape(p as any)
@@ -1231,6 +1245,7 @@ export function tradeWithBank(game: GameDoc, playerId: string, give: Resource, g
 export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
   ensureDevFields(game)
   ensureLongestRoadFields(game)
+  ensureStatsFields(game)
   const players = game.players.map((p) => ({
     _id: asId(p._id),
     name: p.name,
@@ -1247,17 +1262,12 @@ export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
       const p = game.players.find((x) => idEq(x._id, maybePlayerId))
       if (!p) return undefined
       ensurePortsShape(p as any)
-      const victoryCardCount = Array.isArray((p as any).devCards)
-        ? (p as any).devCards.filter((c: any) => c?.kind === 'victory').length
-        : 0
       return {
         playerId: asId(p._id),
         name: p.name,
         resources: p.resources as Record<Resource, number>,
         ports: (p as any).ports,
         devCards: (p as any).devCards ?? [],
-        victoryCardCount,
-        totalVictoryPoints: Number(p.victoryPoints ?? 0) + Number(victoryCardCount ?? 0),
         knightsPlayed: Number((p as any).knightsPlayed ?? 0),
         freeRoadsToPlace: Number((p as any).freeRoadsToPlace ?? 0),
       }
@@ -1301,6 +1311,18 @@ export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
         sum: (game as any).lastRoll.sum,
       }
       : null,
+
+    // End-of-game
+    winnerPlayerId: (game as any).winnerPlayerId ?? null,
+    finishedAt: (game as any).finishedAt ? (new Date((game as any).finishedAt)).toISOString() : null,
+
+    // Statistics
+    stats: (() => {
+      const s = (game as any).stats ?? {}
+      const rc: any = s.rollCounts instanceof Map ? Object.fromEntries(s.rollCounts) : (s.rollCounts ?? {})
+      const rg: any = s.resourceGains instanceof Map ? Object.fromEntries(s.resourceGains) : (s.resourceGains ?? {})
+      return { rollCounts: rc, resourceGains: rg }
+    })(),
     turnHasRolled: (game as any).turnHasRolled ?? false,
     turnNumber: Number((game as any).turnNumber ?? 1),
     devDeckCount: Array.isArray((game as any).devDeck) ? (game as any).devDeck.length : 0,
@@ -1381,7 +1403,6 @@ function applyDelta(p: any, delta: Record<Resource, number>) {
 function requireMainTradeWindow(game: GameDoc, playerId: string) {
   if (game.phase !== 'main') throw new Error('Kereskedni csak main fázisban lehet.')
   requireTurn(game, playerId)
-  requireRobberResolved(game, playerId)
   if (!((game as any).turnHasRolled ?? false)) throw new Error('Dobás után lehet kereskedni.')
 }
 

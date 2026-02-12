@@ -65,9 +65,9 @@ export function ResourceCardsPanel({ game }: { game: GameState }) {
       <div className="mb-3 flex items-end justify-between gap-3">
         <h3 className="text-sm font-semibold text-slate-100">Kártyáid</h3>
         <div className="text-xs text-slate-200">
-          {r ?
-            <span className='flex items-center justify-end gap-1'><TrophyIcon /> {((game.players.find(p => p._id === game.you?.playerId)?.victoryPoints ?? 0) + (game.you?.victoryCardCount ?? 0))} GYP</span>
-            : 'Betöltés…'}
+          {r ? 
+            <span className='flex items-center justify-end gap-1'><TrophyIcon /> { game.players.find(p => p._id === game.you?.playerId)?.victoryPoints ?? 0} VP</span>
+          : 'Betöltés…'}
         </div>
       </div>
 

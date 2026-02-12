@@ -206,7 +206,7 @@ export function LongestRoadIcon(props: IconProps) {
   )
 }
 
-export function MenuIcon({ type, isChat, ...props }: IconProps & { type: 'overview' | 'actions' | 'dev' | 'trade' | 'bank' | 'players' | 'chat' | 'log', isChat?: boolean }) {
+export function MenuIcon({ type, isChat, ...props }: IconProps & { type: 'overview' | 'actions' | 'dev' | 'trade' | 'bank' | 'players' | 'chat' | 'log' | 'stats', isChat?: boolean }) {
   switch (type) {
     case 'overview':
       return (
@@ -267,6 +267,14 @@ export function MenuIcon({ type, isChat, ...props }: IconProps & { type: 'overvi
       return (
         <Base {...props} title={props.title ?? 'Játékmenet napló'} fill='currentColor' stroke='none'>
           <path d="M19 5v9h-5v5H5V5h14Zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h10l6-6V5c0-1.1-.9-2-2-2Zm-7 11H7v-2h5v2Zm5-4H7V8h10v2Z"></path>
+        </Base>
+      )
+
+    case 'stats':
+      return (
+        <Base {...props} title={props.title ?? 'Statisztika'} fill='currentColor' stroke='none'>
+          <path d="M5 9h3v10H5V9Zm5-4h3v14h-3V5Zm5 7h3v7h-3v-7Z" />
+          <path d="M4 19h16v2H4v-2Z" />
         </Base>
       )
 

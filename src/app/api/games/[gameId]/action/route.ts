@@ -13,6 +13,7 @@ import {
   createTradeOffer,
   endTurn,
   moveRobber,
+  maybeFinishGame,
   placeRoad,
   placeSettlement,
   playDevCard,
@@ -153,6 +154,9 @@ export async function POST(req: Request, { params }: { params: { gameId: string 
         break
       }
     }
+
+    // Win condition check (10 VP by default, configurable via settings.maxVictoryPoints)
+    maybeFinishGame(game as any)
 
     await game.save()
     return NextResponse.json(sanitizeForClient(game as any, body.playerId))

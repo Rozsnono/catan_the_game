@@ -3,7 +3,7 @@
 import useSWR from 'swr'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import type { GameState, Resource } from '@/types/game'
+import type { GameState } from '@/types/game'
 import { getJSON, postJSON } from '@/lib/api'
 import { TopBar } from '@/components/TopBar'
 import { PlayersPanel } from '@/components/PlayersPanel'
@@ -15,10 +15,9 @@ import { BankPanel } from '@/components/BankPanel'
 import { TradePanel } from '@/components/TradePanel'
 import { ChatPanel } from '@/components/ChatPanel'
 import { DevCardsPanel } from '@/components/DevCardsPanel'
-import { DiceIcon, MenuIcon, ResourceIcon, TrophyIcon } from '@/components/icons'
+import { StatsPanel } from '@/components/StatsPanel'
+import { MenuIcon, ResourceIcon } from '@/components/icons'
 import { HU } from '@/types/translate'
-
-const resourceOrder: Resource[] = ['wood', 'brick', 'wheat', 'sheep', 'ore']
 
 function useLocalPlayerId(gameId: string) {
   // Tri-state:
@@ -75,7 +74,7 @@ export default function GamePage() {
   const [toast, setToast] = useState<string | null>(null)
   const [buildMode, setBuildMode] = useState<'none' | 'road' | 'settlement' | 'city'>('none')
   const [panel, setPanel] = useState<
-    null | 'players' | 'actions' | 'resources' | 'bank' | 'trade' | 'chat' | 'dev' | 'log' | 'overview'
+    null | 'players' | 'actions' | 'resources' | 'bank' | 'trade' | 'chat' | 'dev' | 'log' | 'overview' | 'stats'
   >(null)
 
   // Robber steal flow: pick victim first, then pick a resource from them.
@@ -139,13 +138,16 @@ export default function GamePage() {
 
   const me = data.you
   const waitingForPlayers = data.players.length < 2
+  const winner = data.phase === 'finished'
+    ? data.players.find((p) => p._id === data.winnerPlayerId) ?? [...data.players].sort((a, b) => (b.victoryPoints ?? 0) - (a.victoryPoints ?? 0))[0]
+    : null
 
   const PanelShell = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="text-sm font-semibold text-slate-100">{title}</div>
         <button
-          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10"
+          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
           onClick={() => setPanel(null)}
         >
           Bezár
@@ -156,7 +158,7 @@ export default function GamePage() {
   )
 
   return (
-    <div className="relative min-h-[calc(100vh-2rem)] pb-36 md:pb-6">
+    <div className="relative min-h-[calc(100vh-1rem)]">
       {toast ? (
         <div className="fixed left-1/2 top-3 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100 backdrop-blur">
           {toast}
@@ -167,6 +169,35 @@ export default function GamePage() {
         {waitingForPlayers ? (
           <div className="fixed left-1/2 top-14 z-40 -translate-x-1/2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 backdrop-blur">
             Várakozás a többi játékosra…
+          </div>
+        ) : null}
+
+        {data.phase === 'finished' && winner ? (
+          <div className="fixed inset-0 z-50 grid place-items-center p-4">
+            <div className="w-full max-w-md rounded-2xl border border-emerald-400/30 bg-slate-950/90 p-4 shadow-2xl">
+              <div className="text-sm font-semibold text-slate-100">🏁 Játék vége</div>
+              <div className="mt-1 text-sm text-slate-200">
+                Győztes: <span className="font-semibold" style={{ color: winner.color }}>{winner.name}</span>
+                <span className="text-slate-400"> — {winner.victoryPoints} pont</span>
+              </div>
+              {data.finishedAt ? (
+                <div className="mt-1 text-xs text-slate-400">Befejezve: {new Date(data.finishedAt).toLocaleString()}</div>
+              ) : null}
+              <div className="mt-4 flex gap-2">
+                <button
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                  onClick={() => router.push('/')}
+                >
+                  Vissza a lobbyba
+                </button>
+                <button
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                  onClick={() => setPanel('stats')}
+                >
+                  Statisztika
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
         {data.robber?.pending && data.robber.byPlayerId === playerId && !data.robber.awaitingSteal ? (
@@ -249,7 +280,7 @@ export default function GamePage() {
       <div className="relative mx-auto mt-3 w-full max-w-[1400px] px-3 pb-6">
         {/* Board as the main focus */}
         <div className="flex flex-col gap-3 lg:flex-row">
-          <aside className="hidden shrink-0 lg:block lg:w-[300px] xl:w-[300px]">
+          <aside className="shrink-0 lg:w-[300px] xl:w-[300px]">
             <ResourceCardsPanel game={data} />
           </aside>
           <div className="relative flex-1 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
@@ -265,8 +296,8 @@ export default function GamePage() {
               onMoveRobber={(tileId) => act('robber_move', { tileId })}
             />
 
-            {/* Right-side minimal toolbar (desktop/tablet) */}
-            <div className="absolute right-4 top-12 z-20 hidden flex-col gap-2 md:flex">
+            {/* Right-side minimal toolbar */}
+            <div className="absolute right-4 top-12 z-20 flex flex-col gap-2">
               <button
                 className="rounded-xl border border-white/10 bg-slate-950/60 p-2 text-slate-200 hover:bg-slate-950/80 flex items-center gap-1 justify-center"
                 onClick={() => setPanel(panel === 'overview' ? null : 'overview')}
@@ -340,9 +371,19 @@ export default function GamePage() {
                   <MenuIcon type="log" />
                 </span>
               </button>
+
+              <button
+                className="rounded-xl border border-white/10 bg-slate-950/60 p-2 text-slate-200 hover:bg-slate-950/80 flex items-center gap-1 justify-center"
+                onClick={() => setPanel(panel === 'stats' ? null : 'stats')}
+                title="Statisztika"
+              >
+                <span className="text-2xl text-slate-200">
+                  <MenuIcon type="stats" />
+                </span>
+              </button>
             </div>
           </div>
-          <aside className="hidden shrink-0 lg:block lg:w-[300px] xl:w-[300px]">
+          <aside className="shrink-0 lg:w-[300px] xl:w-[300px]">
             <ActionsPanel
               game={data}
               me={playerId}
@@ -354,92 +395,6 @@ export default function GamePage() {
               onJumpDev={() => setPanel('dev')}
             />
           </aside>
-        </div>
-
-        {/* Mobile bottom HUD: always-visible controls + quick tabs */}
-        <div className="fixed inset-x-0 bottom-0 z-30 md:hidden">
-          <div className="safe-bottom mx-auto w-full max-w-[1400px] px-3">
-            {/* Always visible: resources + roll/end-turn */}
-            <div className="mb-2 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-slate-950/80 p-2 shadow-2xl backdrop-blur">
-              <button
-                type="button"
-                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-left hover:bg-white/10"
-                onClick={() => setPanel(panel === 'overview' ? null : 'overview')}
-                title="Kártyák / áttekintés"
-              >
-                <div className="flex items-center gap-1 overflow-x-auto">
-                  {resourceOrder.map((key) => (
-                    <div
-                      key={key}
-                      className="flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-black/10 px-2 py-1 text-xs text-slate-100"
-                    >
-                      <ResourceIcon resource={key} className="h-4 w-4 opacity-90" />
-                      <span className="font-mono">
-                        {data.you?.resources ? data.you.resources[key] : 0}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-1 text-[10px] text-slate-400">
-                  Tap: kártyák / áttekintés
-                </div>
-              </button>
-
-              <div className="flex shrink-0 items-stretch gap-2">
-                <button
-                  type="button"
-                  className="flex items-center gap-2 rounded-xl border border-sky-400/20 bg-sky-500/20 px-3 py-2 text-sm font-semibold text-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => act('roll')}
-                  disabled={
-                    data.currentPlayerId !== playerId ||
-                    data.phase !== 'main' ||
-                    !!data.turnHasRolled ||
-                    !!data.robber?.pending
-                  }
-                  title="Dobás"
-                >
-                  <DiceIcon className="text-base" />
-                  <span className="hidden min-[380px]:inline">Dobás</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-500/15 px-3 py-2 text-sm font-semibold text-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => act('end_turn')}
-                  disabled={data.currentPlayerId !== playerId || data.phase !== 'main' || !!data.robber?.pending}
-                  title="Kör vége"
-                >
-                  <TrophyIcon className="text-base" />
-                  <span className="hidden min-[380px]:inline">Kör vége</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick tabs */}
-            <div className="mb-3 flex gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/80 p-2 shadow-2xl backdrop-blur">
-              {(
-                [
-                  ['actions', 'Akciók'],
-                  ['dev', 'Dev'],
-                  ['trade', 'Csere'],
-                  ['bank', 'Bank'],
-                  ['chat', 'Chat'],
-                  ['players', 'Játékosok'],
-                  ['log', 'Napló'],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  className={`shrink-0 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
-                    panel === id ? 'border-sky-400/40 bg-sky-500/20 text-sky-100' : 'border-white/10 bg-white/5 text-slate-100'
-                  }`}
-                  onClick={() => setPanel(panel === (id as any) ? null : (id as any))}
-                  type="button"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Drawer */}
@@ -536,6 +491,12 @@ export default function GamePage() {
               {panel === 'log' ? (
                 <PanelShell title="Napló">
                   <LogPanel game={data} />
+                </PanelShell>
+              ) : null}
+
+              {panel === 'stats' ? (
+                <PanelShell title="Statisztika">
+                  <StatsPanel game={data} />
                 </PanelShell>
               ) : null}
             </div>

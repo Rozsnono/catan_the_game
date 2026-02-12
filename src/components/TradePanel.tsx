@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import type { GameState, Resource } from '@/types/game'
-import Select from './shared/Select'
+import Select from './Select'
 import { ResourcePill } from './icons'
 
 const RESOURCES: Resource[] = ['wood', 'brick', 'wheat', 'sheep', 'ore']
