@@ -47,3 +47,36 @@ input[type="range"]::-webkit-slider-thumb {
 input[type="range"]::-webkit-slider-thumb:hover {
   background-color: #475569;
 }
+
+/* --- SVG board micro-animations (lightweight, non-gameplay) --- */
+@keyframes catanPopIn {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes catanRobberSlide {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0px); }
+}
+
+@keyframes catanPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+/* New elements mount with a small pop. React keeps keys stable, so it only plays on newly created pieces. */
+.svg-popIn {
+  transform-origin: center;
+  animation: catanPopIn 180ms ease-out;
+}
+
+.svg-robber {
+  transform-origin: center;
+  animation: catanRobberSlide 220ms ease-out;
+}
+
+/* Port badge pulses on hover */
+.svg-portMarker:hover {
+  transform-origin: center;
+  animation: catanPulse 900ms ease-in-out infinite;
+}

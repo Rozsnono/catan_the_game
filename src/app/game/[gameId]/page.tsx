@@ -17,6 +17,7 @@ import { ChatPanel } from '@/components/ChatPanel'
 import { DevCardsPanel } from '@/components/DevCardsPanel'
 import { StatsPanel } from '@/components/StatsPanel'
 import { MenuIcon, ResourceIcon } from '@/components/icons'
+import { Die } from '@/components/Dice'
 import { HU } from '@/types/translate'
 
 function useLocalPlayerId(gameId: string) {
@@ -80,6 +81,10 @@ export default function GamePage() {
   // Robber steal flow: pick victim first, then pick a resource from them.
   const [robberPick, setRobberPick] = useState<null | { playerId: string; name: string; resources?: any }>(null)
 
+  // Small dice animation when rolling (UI-only).
+  const [rolling, setRolling] = useState(false)
+  const [rollAnim, setRollAnim] = useState<{ d1: number; d2: number }>({ d1: 1, d2: 1 })
+
 
   const jumpTo = (id: string) => {
     if (typeof document === 'undefined') return
@@ -87,17 +92,44 @@ export default function GamePage() {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  async function act(type: string, payload?: any) {
+  async function act(type: string, payload?: any): Promise<GameState | undefined> {
     if (!playerId) return
     try {
       const next = await postJSON<GameState>(`/api/games/${gameId}/action`, { playerId, type, payload })
       mutate(next, false)
       if (type === 'end_turn') setBuildMode('none')
       if (type === 'build_road' || type === 'build_settlement' || type === 'build_city') setBuildMode('none')
+      return next
     } catch (e: any) {
       setToast(e?.message ?? String(e))
       setTimeout(() => setToast(null), 2500)
+      return undefined
     }
+  }
+
+  async function rollWithAnim() {
+    if (rolling) return
+    // Only animate if we are in a place where rolling is relevant.
+    if (!data || data.phase !== 'main' || data.turnHasRolled) return act('roll')
+
+    setRolling(true)
+    let t = 0
+    const tick = 90
+    const maxMs = 850
+    const id = setInterval(() => {
+      t += tick
+      const d1 = 1 + Math.floor(Math.random() * 6)
+      const d2 = 1 + Math.floor(Math.random() * 6)
+      setRollAnim({ d1, d2 })
+    }, tick)
+
+    setTimeout(async () => {
+      clearInterval(id)
+      const next = await act('roll')
+      if (next?.lastRoll) setRollAnim({ d1: next.lastRoll.d1, d2: next.lastRoll.d2 })
+      // Keep it visible a touch longer, then fade out.
+      setTimeout(() => setRolling(false), 260)
+    }, maxMs)
   }
 
   // Keep the first paint identical between server and client, then decide.
@@ -162,6 +194,22 @@ export default function GamePage() {
       {toast ? (
         <div className="fixed left-1/2 top-3 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100 backdrop-blur">
           {toast}
+        </div>
+      ) : null}
+
+      {rolling ? (
+        <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 shadow-2xl backdrop-blur">
+            <div className="flex items-center gap-2">
+              <Die value={rollAnim.d1} />
+              <span className="text-slate-500">+</span>
+              <Die value={rollAnim.d2} />
+              <div className="ml-2 text-right">
+                <div className="text-[10px] text-slate-400">Dobás</div>
+                <div className="text-2xl font-extrabold text-slate-100">{rollAnim.d1 + rollAnim.d2}</div>
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -387,7 +435,7 @@ export default function GamePage() {
             <ActionsPanel
               game={data}
               me={playerId}
-              onRoll={() => act('roll')}
+              onRoll={() => rollWithAnim()}
               onEndTurn={() => act('end_turn')}
               buildMode={buildMode}
               setBuildMode={setBuildMode}
@@ -407,7 +455,7 @@ export default function GamePage() {
                   <ActionsPanel
                     game={data}
                     me={playerId}
-                    onRoll={() => act('roll')}
+                    onRoll={() => rollWithAnim()}
                     onEndTurn={() => act('end_turn')}
                     buildMode={buildMode}
                     setBuildMode={setBuildMode}
@@ -433,7 +481,7 @@ export default function GamePage() {
                   <ActionsPanel
                     game={data}
                     me={playerId}
-                    onRoll={() => act('roll')}
+                    onRoll={() => rollWithAnim()}
                     onEndTurn={() => act('end_turn')}
                     buildMode={buildMode}
                     setBuildMode={setBuildMode}

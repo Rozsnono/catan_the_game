@@ -21,6 +21,60 @@ function portLabel(kind: PortKind) {
   return map[kind];
 }
 
+function portIcon(kind: PortKind) {
+  // Small icon for port marker (purely visual).
+  const common = { fill: 'none', stroke: 'rgba(226,232,240,.92)', strokeWidth: 2.1, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  if (kind === 'threeToOne') {
+    return (
+      <g transform="translate(0 -5) scale(0.95)">
+        <path d="M -7 2 C -3 -2, 3 -2, 7 2" {...common} opacity={0.9} />
+        <path d="M -6 -4 L -2 -8" {...common} opacity={0.75} />
+        <path d="M 6 -4 L 2 -8" {...common} opacity={0.75} />
+      </g>
+    )
+  }
+  switch (kind) {
+    case 'wood':
+      return (
+        <g transform="translate(0 -6)">
+          <path d="M 0 -7 C -4 -5, -4 -1, 0 1 C 4 -1, 4 -5, 0 -7 Z" {...common} opacity={0.9} />
+          <path d="M 0 1 L 0 7" {...common} opacity={0.75} />
+        </g>
+      )
+    case 'brick':
+      return (
+        <g transform="translate(0 -6)">
+          <rect x={-7} y={-6} width={14} height={10} rx={2} ry={2} fill="rgba(2,6,23,.30)" stroke="rgba(226,232,240,.85)" strokeWidth={2} />
+          <path d="M -7 -1 H 7" {...common} opacity={0.6} />
+          <path d="M 0 -6 V 4" {...common} opacity={0.6} />
+        </g>
+      )
+    case 'wheat':
+      return (
+        <g transform="translate(0 -6)">
+          <path d="M -1 7 V -7" {...common} opacity={0.8} />
+          <path d="M -1 -4 C -4 -4, -4 -1, -1 -1" {...common} opacity={0.85} />
+          <path d="M -1 -1 C -4 -1, -4 2, -1 2" {...common} opacity={0.75} />
+          <path d="M -1 -4 C 2 -4, 2 -1, -1 -1" {...common} opacity={0.65} />
+          <path d="M -1 -1 C 2 -1, 2 2, -1 2" {...common} opacity={0.55} />
+        </g>
+      )
+    case 'sheep':
+      return (
+        <g transform="translate(0 -6)">
+          <path d="M -6 0 C -6 -4, -2 -6, 1 -4 C 4 -6, 7 -3, 6 1 C 6 5, 2 6, -1 4 C -4 6, -6 4, -6 0 Z" {...common} opacity={0.85} />
+        </g>
+      )
+    case 'ore':
+      return (
+        <g transform="translate(0 -6)">
+          <path d="M -7 5 L -2 -6 L 2 -2 L 7 5 Z" {...common} opacity={0.9} />
+          <path d="M -2 -6 L 2 -2" {...common} opacity={0.6} />
+        </g>
+      )
+  }
+}
+
 export function Board({
   game,
   me,
@@ -47,6 +101,10 @@ export function Board({
   const dragRef = useRef<{ active: boolean; pointerId: number | null; start: { x: number; y: number } | null; origin: { tx: number; ty: number } }>(
     { active: false, pointerId: null, start: null, origin: { tx: 0, ty: 0 } }
   )
+
+  const [hoverEdgeId, setHoverEdgeId] = useState<string | null>(null)
+  const [hoverTileId, setHoverTileId] = useState<string | null>(null)
+  const [hoverClientPos, setHoverClientPos] = useState<{ x: number; y: number } | null>(null)
 
   const clientToSvg = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current
@@ -95,6 +153,12 @@ export function Board({
   }, [clientToSvg, panZoom.tx, panZoom.ty])
 
   const onPointerMove = useCallback((e: PointerEvent<SVGSVGElement>) => {
+    // Keep tooltip anchored to the pointer while hovering a tile.
+    if (hoverTileId) {
+      const rect = svgRef.current?.getBoundingClientRect()
+      if (rect) setHoverClientPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    }
+
     if (!dragRef.current.active) return
     if (dragRef.current.pointerId !== e.pointerId) return
     const start = dragRef.current.start
@@ -104,7 +168,7 @@ export function Board({
     const dy = p.y - start.y
     const origin = dragRef.current.origin
     setPanZoom((v) => ({ ...v, tx: origin.tx + dx, ty: origin.ty + dy }))
-  }, [clientToSvg])
+  }, [clientToSvg, hoverTileId])
 
   const endDrag = useCallback((e: PointerEvent<SVGSVGElement>) => {
     if (!dragRef.current.active) return
@@ -118,6 +182,14 @@ export function Board({
   }, [])
 
   const robberMoveMode = Boolean((game as any).robber?.pending) && (game as any).robber?.byPlayerId === me && !Boolean((game as any).robber?.awaitingSteal)
+
+  const tileById = useMemo(() => {
+    const m = new Map<string, (typeof game.tiles)[number]>()
+    for (const t of game.tiles) m.set(t.id, t)
+    return m
+  }, [game.tiles])
+
+  const hoveredTile = hoverTileId ? tileById.get(hoverTileId) : null
 
   const size = 48 // base hex size in px (SVG units)
   const graph = useMemo(() => buildGraphFromTiles(game.tiles, size), [game.tiles])
@@ -175,6 +247,8 @@ export function Board({
     return m
   }, [game.players])
 
+  const myCol = playerColor.get(me) ?? 'white'
+
   const isMyTurn = game.currentPlayerId === me
   const canPlaceSettlement = game.phase === 'setup' && isMyTurn && game.setupStep === 'place_settlement'
   const canPlaceRoad = game.phase === 'setup' && isMyTurn && game.setupStep === 'place_road'
@@ -214,7 +288,11 @@ export function Board({
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          onPointerLeave={endDrag}
+          onPointerLeave={(e) => {
+            endDrag(e)
+            setHoverTileId(null)
+            setHoverClientPos(null)
+          }}
           style={{ touchAction: 'none' }}
           viewBox={`${extents.minX} ${extents.minY} ${extents.w} ${extents.h}`}
           className="h-[55vh] w-full min-h-[380px] select-none md:h-[62vh] lg:h-[68vh]"
@@ -222,6 +300,35 @@ export function Board({
           aria-label="Catan tábla"
         >
           <defs>
+            <filter id="f_softShadow" x="-40%" y="-40%" width="180%" height="180%">
+              <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="rgba(0,0,0,.55)" />
+            </filter>
+            <filter id="f_tokenShadow" x="-60%" y="-60%" width="220%" height="220%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="rgba(0,0,0,.55)" />
+            </filter>
+
+            {/* Build-mode glow helpers */}
+            <filter id="f_glowSky" x="-80%" y="-80%" width="260%" height="260%">
+              <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="rgba(56,189,248,.55)" />
+              <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="rgba(56,189,248,.35)" />
+            </filter>
+            <filter id="f_glowGreen" x="-80%" y="-80%" width="260%" height="260%">
+              <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="rgba(52,211,153,.55)" />
+              <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="rgba(52,211,153,.35)" />
+            </filter>
+            <filter id="f_glowAmber" x="-80%" y="-80%" width="260%" height="260%">
+              <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="rgba(251,191,36,.55)" />
+              <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="rgba(251,191,36,.35)" />
+            </filter>
+            <filter id="f_glowRed" x="-90%" y="-90%" width="280%" height="280%">
+              <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="rgba(248,113,113,.55)" />
+              <feDropShadow dx="0" dy="0" stdDeviation="12" floodColor="rgba(248,113,113,.30)" />
+            </filter>
+            <radialGradient id="g_token" cx="35%" cy="30%" r="70%">
+              <stop offset="0%" stopColor="rgba(226,232,240,.22)" />
+              <stop offset="55%" stopColor="rgba(2,6,23,.65)" />
+              <stop offset="100%" stopColor="rgba(2,6,23,.90)" />
+            </radialGradient>
             <linearGradient id="g_ocean" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="rgba(2, 132, 199, .1)" />
               <stop offset="60%" stopColor="rgba(30, 58, 138, .1)" />
@@ -281,17 +388,45 @@ export function Board({
                   <path
                     d={d}
                     fill={fill}
-                    stroke={robberMoveMode ? "rgba(248,113,113,.55)" : "rgba(255,255,255,.14)"}
-                    strokeWidth={robberMoveMode ? 3 : 2}
-                    className={robberMoveMode ? "cursor-pointer hover:opacity-95" : undefined}
+                    filter="url(#f_softShadow)"
+                    stroke={
+                      robberMoveMode
+                        ? t.hasRobber
+                          ? 'rgba(148,163,184,.22)'
+                          : 'rgba(248,113,113,.55)'
+                        : 'rgba(255,255,255,.16)'
+                    }
+                    strokeWidth={robberMoveMode ? 2.4 : 2.2}
+                    className={robberMoveMode && onMoveRobber ? 'cursor-pointer' : undefined}
+                    onPointerEnter={(e) => {
+                      setHoverTileId(t.id)
+                      const rect = svgRef.current?.getBoundingClientRect()
+                      if (rect) setHoverClientPos({ x: (e as any).clientX - rect.left, y: (e as any).clientY - rect.top })
+                    }}
+                    onPointerLeave={() => {
+                      setHoverTileId(null)
+                      setHoverClientPos(null)
+                    }}
                     onClick={robberMoveMode && onMoveRobber ? () => onMoveRobber(t.id) : undefined}
                   />
+                  {robberMoveMode && !t.hasRobber ? (
+                    <path
+                      d={d}
+                      fill="transparent"
+                      stroke={hoverTileId === t.id ? 'rgba(248,113,113,.92)' : 'rgba(248,113,113,.70)'}
+                      strokeWidth={hoverTileId === t.id ? 6.5 : 5}
+                      filter="url(#f_glowRed)"
+                      opacity={hoverTileId === t.id ? 0.9 : 0.65}
+                      pointerEvents="none"
+                    />
+                  ) : null}
 
                   {/* number token */}
                   {t.numberToken ? (
                     <g>
-                      <circle cx={c.x} cy={c.y} r={16} fill="rgba(2,6,23,.55)" stroke="rgba(255,255,255,.16)" />
-                      <text x={c.x} y={c.y + 5} textAnchor="middle" fontSize={14} fontWeight={800} fill={`${t.numberToken === 6 || t.numberToken === 8 ? '#ff4f4f' : 'rgba(226,232,240,.95)'}`}>
+                      <circle cx={c.x} cy={c.y} r={18} fill="url(#g_token)" stroke="rgba(255,255,255,.22)" filter="url(#f_tokenShadow)" />
+                      <circle cx={c.x} cy={c.y} r={18} fill="transparent" stroke="rgba(148,163,184,.18)" strokeWidth={2} />
+                      <text x={c.x} y={c.y + 5} textAnchor="middle" fontSize={15} fontWeight={900} fill={`${t.numberToken === 6 || t.numberToken === 8 ? 'rgba(251,113,133,.95)' : 'rgba(226,232,240,.96)'}`}>
                         {t.numberToken}
                       </text>
                     </g>
@@ -305,11 +440,16 @@ export function Board({
 
                   {/* robber */}
                   {t.hasRobber ? (
-                    <g>
-                      <circle cx={c.x} cy={c.y - 22} r={10} fill="rgba(15,23,42,.85)" stroke="rgba(255,255,255,.18)" />
-                      <text x={c.x} y={c.y - 18} textAnchor="middle" fontSize={10} fontWeight={800} fill="rgba(248,113,113,.9)">
-                        R
-                      </text>
+                    <g className="svg-robber" transform={`translate(${c.x} ${c.y - 28})`} filter="url(#f_tokenShadow)">
+                      <circle cx={0} cy={-7} r={6} fill="rgba(2,6,23,.78)" stroke="rgba(255,255,255,.20)" />
+                      <path
+                        d="M -10 12 C -8 2, -5 -1, 0 -1 C 5 -1, 8 2, 10 12 C 6 15, -6 15, -10 12 Z"
+                        fill="rgba(2,6,23,.78)"
+                        stroke="rgba(255,255,255,.20)"
+                        strokeWidth={1.6}
+                        strokeLinejoin="round"
+                      />
+                      <path d="M -4 2 C -2 0, 2 0, 4 2" fill="none" stroke="rgba(251,113,133,.85)" strokeWidth={2} strokeLinecap="round" />
                     </g>
                   ) : null}
                 </g>
@@ -404,10 +544,15 @@ export function Board({
                   <polygon points={dockPoints} fill="rgba(2,6,23,.70)" stroke="rgba(255,255,255,.18)" strokeWidth={2} />
 
                   {/* label marker */}
-                  <circle cx={labelPos.x} cy={labelPos.y} r={14} fill="rgba(2,6,23,.70)" stroke="rgba(255,255,255,.18)" />
-                  <text x={labelPos.x} y={labelPos.y + 4} textAnchor="middle" fontSize={10} fontWeight={900} fill="rgba(226,232,240,.95)">
-                    {portLabel(p.kind)}
-                  </text>
+                  <g className="svg-portMarker" transform={`translate(${labelPos.x} ${labelPos.y})`} filter="url(#f_tokenShadow)">
+                    <g className="port-marker">
+                      <rect x={-18} y={-18} width={36} height={36} rx={12} ry={12} fill="rgba(2,6,23,.72)" stroke="rgba(255,255,255,.18)" />
+                    </g>
+                    {portIcon(p.kind)}
+                    <text x={0} y={12} textAnchor="middle" fontSize={10} fontWeight={900} fill="rgba(226,232,240,.95)">
+                      {portLabel(p.kind)}
+                    </text>
+                  </g>
                 </g>
               )
             })}
@@ -419,17 +564,29 @@ export function Board({
               const a = graph.nodes.find((n) => n.id === e.a)!.p
               const b = graph.nodes.find((n) => n.id === e.b)!.p
               return (
-                <line
-                  key={e.id}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke={playerColor.get(owner) ?? 'white'}
-                  strokeWidth={8}
-                  strokeLinecap="round"
-                  opacity={0.9}
-                />
+                <g key={e.id}>
+                  {/* dark underlay for contrast */}
+                  <line
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke="rgba(2,6,23,.55)"
+                    strokeWidth={11}
+                    strokeLinecap="round"
+                    opacity={0.9}
+                  />
+                  <line
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke={playerColor.get(owner) ?? 'white'}
+                    strokeWidth={8}
+                    strokeLinecap="round"
+                    opacity={0.95}
+                  />
+                </g>
               )
             })}
 
@@ -439,52 +596,61 @@ export function Board({
               if (!pl) return null
               const col = playerColor.get(pl.playerId) ?? 'white'
               const isCity = pl.kind === 'city'
-              const w = isCity ? 26 : 22
-              const h = isCity ? 24 : 20
-              const roofH = isCity ? 12 : 10
-              const bodyTop = -h / 2 + roofH
-              const bodyBottom = h / 2
-              const bodyW = w * (isCity ? 0.78 : 0.74)
-              const roofW = w
               const stroke = 'rgba(2,6,23,.65)'
 
-              // Simple “house” silhouette (roof + body) centered at (0,0)
-              const housePath = [
-                // roof
-                `M 0 ${-h / 2}`,
-                `L ${roofW / 2} ${bodyTop}`,
-                `L ${bodyW / 2} ${bodyTop}`,
-                // body right
-                `L ${bodyW / 2} ${bodyBottom}`,
-                `L ${-bodyW / 2} ${bodyBottom}`,
-                // body left up
-                `L ${-bodyW / 2} ${bodyTop}`,
-                `L ${-roofW / 2} ${bodyTop}`,
-                'Z',
-              ].join(' ')
-
-              // City gets a little “tower” bump to feel more like a bigger building
-              const towerPath = isCity
-                ? [
-                  `M ${-bodyW * 0.18} ${bodyTop}`,
-                  `L ${-bodyW * 0.18} ${bodyTop - roofH * 0.55}`,
-                  `L ${bodyW * 0.18} ${bodyTop - roofH * 0.55}`,
-                  `L ${bodyW * 0.18} ${bodyTop}`,
+              const house = (w: number, h: number) => {
+                const roofH = h * 0.48
+                const bodyTop = -h / 2 + roofH
+                const bodyBottom = h / 2
+                const bodyW = w * 0.74
+                const roofW = w
+                const path = [
+                  `M 0 ${-h / 2}`,
+                  `L ${roofW / 2} ${bodyTop}`,
+                  `L ${bodyW / 2} ${bodyTop}`,
+                  `L ${bodyW / 2} ${bodyBottom}`,
+                  `L ${-bodyW / 2} ${bodyBottom}`,
+                  `L ${-bodyW / 2} ${bodyTop}`,
+                  `L ${-roofW / 2} ${bodyTop}`,
                   'Z',
                 ].join(' ')
-                : null
+                const door = {
+                  d: `M ${-w * 0.10} ${bodyBottom} L ${-w * 0.10} ${bodyBottom - h * 0.30} L ${w * 0.10} ${bodyBottom - h * 0.30} L ${w * 0.10} ${bodyBottom}`,
+                }
+                return { path, door, bodyBottom }
+              }
+
+              // Settlement: single small house. City: a small cluster (2 houses + a center hall).
+              const settle = house(22, 20)
+              const cityHouse = house(16, 16)
+              const cityHall = house(20, 22)
 
               return (
-                <g key={n.id} transform={`translate(${n.p.x} ${n.p.y})`}>
-                  {towerPath ? <path d={towerPath} fill={col} opacity={0.95} stroke={stroke} strokeWidth={2.2} /> : null}
-                  <path d={housePath} fill={col} opacity={0.95} stroke={stroke} strokeWidth={2.2} strokeLinejoin="round" />
-                  {/* little door */}
-                  <path
-                    d={`M ${-w * 0.09} ${bodyBottom} L ${-w * 0.09} ${bodyBottom - h * 0.30} L ${w * 0.09} ${bodyBottom - h * 0.30} L ${w * 0.09} ${bodyBottom}`}
-                    fill="rgba(2,6,23,.18)"
-                    stroke="rgba(2,6,23,.35)"
-                    strokeWidth={1.6}
-                  />
+                <g key={n.id} className="svg-popIn" transform={`translate(${n.p.x} ${n.p.y})`} filter="url(#f_tokenShadow)">
+                  {!isCity ? (
+                    <g>
+                      <path d={settle.path} fill={col} opacity={0.95} stroke={stroke} strokeWidth={2.2} strokeLinejoin="round" />
+                      <path d={settle.door.d} fill="rgba(2,6,23,.18)" stroke="rgba(2,6,23,.35)" strokeWidth={1.6} />
+                    </g>
+                  ) : (
+                    <g>
+                      {/* side houses */}
+                      <g transform="translate(-10 4)">
+                        <path d={cityHouse.path} fill={col} opacity={0.95} stroke={stroke} strokeWidth={2.0} strokeLinejoin="round" />
+                      </g>
+                      <g transform="translate(10 4)">
+                        <path d={cityHouse.path} fill={col} opacity={0.95} stroke={stroke} strokeWidth={2.0} strokeLinejoin="round" />
+                      </g>
+                      {/* center hall */}
+                      <g transform="translate(0 -2)">
+                        <path d={cityHall.path} fill={col} opacity={0.97} stroke={stroke} strokeWidth={2.4} strokeLinejoin="round" />
+                        <path d={cityHall.door.d} fill="rgba(2,6,23,.18)" stroke="rgba(2,6,23,.35)" strokeWidth={1.6} />
+                      </g>
+                      {/* little window dots */}
+                      <circle cx={-6} cy={6} r={1.7} fill="rgba(2,6,23,.22)" />
+                      <circle cx={6} cy={6} r={1.7} fill="rgba(2,6,23,.22)" />
+                    </g>
+                  )}
                 </g>
               )
             })}
@@ -492,19 +658,36 @@ export function Board({
             {canPlaceSettlement
               ? graph.nodes.map((n) => {
                 const occupied = placementsByNode.has(n.id)
+                const can = !occupied
                 return (
-                  <circle
-                    key={`clickN_${n.id}`}
-                    cx={n.p.x}
-                    cy={n.p.y}
-                    r={13}
-                    strokeWidth={2}
-                    className={(occupied ? '' : 'cursor-pointer hover:opacity-90') + ` ${occupied ? 'fill-transparent' : 'fill-sky-400/5 hover:fill-sky-400/20'} ${occupied ? 'stroke-transparent' : 'stroke-sky-400/30 hover:stroke-sky-400/80'}`}
-                    onClick={() => {
-                      if (occupied) return
-                      onPlaceSettlement(n.id)
-                    }}
-                  />
+                  <g key={`clickN_${n.id}`}>
+                    {/* invalid markers stay faint so the board is readable */}
+                    {!can ? (
+                      <circle cx={n.p.x} cy={n.p.y} r={11} fill="rgba(2,6,23,.10)" stroke="rgba(148,163,184,.12)" strokeWidth={2} />
+                    ) : (
+                      <circle
+                        cx={n.p.x}
+                        cy={n.p.y}
+                        r={13}
+                        fill="rgba(56,189,248,.10)"
+                        stroke="rgba(56,189,248,.65)"
+                        strokeWidth={2.5}
+                        filter="url(#f_glowSky)"
+                      />
+                    )}
+                    {/* clickable hit target */}
+                    <circle
+                      cx={n.p.x}
+                      cy={n.p.y}
+                      r={14}
+                      fill="transparent"
+                      className={can ? 'cursor-pointer' : ''}
+                      onClick={() => {
+                        if (!can) return
+                        onPlaceSettlement(n.id)
+                      }}
+                    />
+                  </g>
                 )
               })
               : null}
@@ -513,19 +696,34 @@ export function Board({
             {canBuildSettlement
               ? graph.nodes.map((n) => {
                 const occupied = placementsByNode.has(n.id)
+                const can = !occupied
                 return (
-                  <circle
-                    key={`buildSet_${n.id}`}
-                    cx={n.p.x}
-                    cy={n.p.y}
-                    r={14}
-                    strokeWidth={2}
-                    className={(occupied ? '' : 'cursor-pointer hover:opacity-90') + ` ${occupied ? 'fill-transparent' : 'fill-emerald-400/5 hover:fill-emerald-400/20'} ${occupied ? 'stroke-transparent' : 'stroke-emerald-400/30 hover:stroke-emerald-400/80'}`}
-                    onClick={() => {
-                      if (occupied) return
-                      onBuildSettlement(n.id)
-                    }}
-                  />
+                  <g key={`buildSet_${n.id}`}>
+                    {!can ? (
+                      <circle cx={n.p.x} cy={n.p.y} r={11.5} fill="rgba(2,6,23,.10)" stroke="rgba(148,163,184,.12)" strokeWidth={2} />
+                    ) : (
+                      <circle
+                        cx={n.p.x}
+                        cy={n.p.y}
+                        r={14}
+                        fill="rgba(52,211,153,.10)"
+                        stroke="rgba(52,211,153,.65)"
+                        strokeWidth={2.6}
+                        filter="url(#f_glowGreen)"
+                      />
+                    )}
+                    <circle
+                      cx={n.p.x}
+                      cy={n.p.y}
+                      r={15}
+                      fill="transparent"
+                      className={can ? 'cursor-pointer' : ''}
+                      onClick={() => {
+                        if (!can) return
+                        onBuildSettlement(n.id)
+                      }}
+                    />
+                  </g>
                 )
               })
               : null}
@@ -536,19 +734,32 @@ export function Board({
                 const pl = placementsByNode.get(n.id)
                 const can = pl && pl.playerId === me && pl.kind === 'settlement'
                 return (
-                  <circle
-                    key={`buildCity_${n.id}`}
-                    cx={n.p.x}
-                    cy={n.p.y}
-                    r={14}
-                    strokeWidth={2}
-                    className={(!can ? '' : 'cursor-pointer hover:opacity-90') + ` ${!can ? 'fill-transparent' : 'fill-amber-400/5 hover:fill-amber-400/20'} ${!can ? 'stroke-transparent' : 'stroke-amber-400/30 hover:stroke-amber-400/80'}`}
-
-                    onClick={() => {
-                      if (!can) return
-                      onBuildCity(n.id)
-                    }}
-                  />
+                  <g key={`buildCity_${n.id}`}>
+                    {!can ? (
+                      <circle cx={n.p.x} cy={n.p.y} r={11.5} fill="rgba(2,6,23,.10)" stroke="rgba(148,163,184,.12)" strokeWidth={2} />
+                    ) : (
+                      <circle
+                        cx={n.p.x}
+                        cy={n.p.y}
+                        r={14}
+                        fill="rgba(251,191,36,.10)"
+                        stroke="rgba(251,191,36,.70)"
+                        strokeWidth={2.6}
+                        filter="url(#f_glowAmber)"
+                      />
+                    )}
+                    <circle
+                      cx={n.p.x}
+                      cy={n.p.y}
+                      r={15}
+                      fill="transparent"
+                      className={can ? 'cursor-pointer' : ''}
+                      onClick={() => {
+                        if (!can) return
+                        onBuildCity(n.id)
+                      }}
+                    />
+                  </g>
                 )
               })
               : null}
@@ -559,22 +770,41 @@ export function Board({
                 const occupied = placementsByEdge.has(e.id)
                 const a = graph.nodes.find((n) => n.id === e.a)!.p
                 const b = graph.nodes.find((n) => n.id === e.b)!.p
+                const can = !occupied
                 return (
-                  <line
-                    key={`clickE_${e.id}`}
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    strokeWidth={12}
-                    strokeLinecap="round"
-                    opacity={occupied ? 0 : 0.6}
-                    className={(occupied ? '' : 'cursor-pointer') + ` ${(occupied ? 'stroke-transparent' : 'stroke-sky-400/20 hover:stroke-sky-400')}`}
-                    onClick={() => {
-                      if (occupied) return
-                      onPlaceRoad(e.id)
-                    }}
-                  />
+                  <g key={`clickE_${e.id}`}>
+                    {!can ? (
+                      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(148,163,184,.10)" strokeWidth={9} strokeLinecap="round" />
+                    ) : (
+                      <line
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        stroke="rgba(56,189,248,.55)"
+                        strokeWidth={12}
+                        strokeLinecap="round"
+                      />
+                    )}
+                    <line
+                      x1={a.x}
+                      y1={a.y}
+                      x2={b.x}
+                      y2={b.y}
+                      stroke="transparent"
+                      strokeWidth={18}
+                      strokeLinecap="round"
+                      className={can ? 'cursor-pointer' : ''}
+                      onPointerEnter={() => {
+                        if (can) setHoverEdgeId(e.id)
+                      }}
+                      onPointerLeave={() => setHoverEdgeId(null)}
+                      onClick={() => {
+                        if (!can) return
+                        onPlaceRoad(e.id)
+                      }}
+                    />
+                  </g>
                 )
               })
               : null}
@@ -585,28 +815,74 @@ export function Board({
                 const occupied = placementsByEdge.has(e.id)
                 const a = graph.nodes.find((n) => n.id === e.a)!.p
                 const b = graph.nodes.find((n) => n.id === e.b)!.p
+                const can = !occupied
                 return (
-                  <line
-                    key={`buildRoad_${e.id}`}
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke={occupied ? 'transparent' : 'rgba(59,130,246,.40)'}
-                    strokeWidth={12}
-                    strokeLinecap="round"
-                    opacity={occupied ? 0 : 0.6}
-                    className={(occupied ? '' : 'cursor-pointer') + ` ${(occupied ? 'stroke-transparent' : 'stroke-sky-400/20 hover:stroke-sky-400')}`}
-                    onClick={() => {
-                      if (occupied) return
-                      onBuildRoad(e.id)
-                    }}
-                  />
+                  <g key={`buildRoad_${e.id}`}>
+                    {!can ? (
+                      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(148,163,184,.10)" strokeWidth={9} strokeLinecap="round" />
+                    ) : (
+                      <line
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        stroke="rgba(56,189,248,.55)"
+                        strokeWidth={12}
+                        strokeLinecap="round"
+                      />
+                    )}
+                    <line
+                      x1={a.x}
+                      y1={a.y}
+                      x2={b.x}
+                      y2={b.y}
+                      stroke="transparent"
+                      strokeWidth={18}
+                      strokeLinecap="round"
+                      className={can ? 'cursor-pointer' : ''}
+                      onPointerEnter={() => {
+                        if (can) setHoverEdgeId(e.id)
+                      }}
+                      onPointerLeave={() => setHoverEdgeId(null)}
+                      onClick={() => {
+                        if (!can) return
+                        onBuildRoad(e.id)
+                      }}
+                    />
+                  </g>
                 )
               })
               : null}
           </g>
         </svg>
+
+        {/* Hex hover tooltip */}
+        {hoveredTile && hoverClientPos ? (
+          <div
+            className="pointer-events-none absolute z-20 max-w-[220px] -translate-y-2 rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-xs text-slate-100 shadow-xl shadow-black/40"
+            style={{ left: hoverClientPos.x + 12, top: hoverClientPos.y + 12 }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-semibold">
+                {tileLabel(hoveredTile.type)}
+              </div>
+              {typeof hoveredTile.numberToken === 'number' ? (
+                <div className="rounded-full bg-white/10 px-2 py-0.5 font-extrabold">
+                  {hoveredTile.numberToken}
+                </div>
+              ) : null}
+            </div>
+            <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-200/80">
+              {hoveredTile.hasRobber ? (
+                <span className="rounded-full bg-red-500/15 px-2 py-0.5 font-semibold text-red-200">Rabló</span>
+              ) : (
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-200">Termel</span>
+              )}
+              <span className="text-slate-300/70">•</span>
+              <span className="text-slate-200/80">Mutató: hover</span>
+            </div>
+          </div>
+        ) : null}
 
         <div className="absolute left-2 top-2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs text-slate-200">
           Tile-k: SVG pattern · Reszponzív viewBox

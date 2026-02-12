@@ -155,7 +155,7 @@ export default function Dropdown(
                 aria-label="Dropdown menu"
                 onKeyDown={onMenuKeyDown}
                 className={[
-                    "absolute right-0 mt-2 w-44 origin-top-right rounded-md border border-gray-800 bg-white shadow-lg z-10",
+                    "absolute left-0 mt-2 w-44 origin-top-right rounded-md border border-gray-800 bg-white shadow-lg z-10",
                     "outline-none",
                     // animation
                     "transition duration-150 ease-out",
