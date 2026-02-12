@@ -64,6 +64,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
   50% { transform: scale(1.06); }
 }
 
+@keyframes catanTileGlow {
+  0% { opacity: 0.15; }
+  30% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
 /* New elements mount with a small pop. React keeps keys stable, so it only plays on newly created pieces. */
 .svg-popIn {
   transform-origin: center;
@@ -79,4 +85,19 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .svg-portMarker:hover {
   transform-origin: center;
   animation: catanPulse 900ms ease-in-out infinite;
+}
+
+/* Brief roll highlight on producing tiles */
+.svg-rollHit {
+  transform-origin: center;
+  animation: catanTileGlow 1200ms ease-out;
+}
+
+/* Turn banner */
+.turn-banner {
+  @apply rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100 backdrop-blur;
+}
+
+.turn-banner--you {
+  @apply border-emerald-400/20 bg-emerald-500/10;
 }

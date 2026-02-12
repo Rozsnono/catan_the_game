@@ -18,6 +18,7 @@ import { DevCardsPanel } from '@/components/DevCardsPanel'
 import { StatsPanel } from '@/components/StatsPanel'
 import { MenuIcon, ResourceIcon } from '@/components/icons'
 import { Die } from '@/components/Dice'
+import { TurnBanner } from '@/components/TurnBanner'
 import { HU } from '@/types/translate'
 
 function useLocalPlayerId(gameId: string) {
@@ -52,8 +53,27 @@ export default function GamePage() {
   const { data, error, mutate, isLoading } = useSWR<GameState>(
     hydrated && playerId ? `/api/games/${gameId}?playerId=${playerId}` : null,
     (url) => getJSON<GameState>(url),
-    { refreshInterval: 2000 }
+    // Prefer real-time (SSE). We keep polling off by default and rely on event updates.
+    { revalidateOnFocus: true }
   )
+
+  // Realtime updates (Server-Sent Events). Falls back to focus revalidation.
+  useEffect(() => {
+    if (!hydrated || !playerId) return
+    if (typeof EventSource === 'undefined') return
+
+    const es = new EventSource(`/api/games/${gameId}/events`)
+    es.onmessage = () => {
+      // any event means state may have changed
+      mutate()
+    }
+    es.onerror = () => {
+      // silently let it reconnect; browsers handle retries
+    }
+    return () => {
+      es.close()
+    }
+  }, [gameId, hydrated, playerId, mutate])
 
   const youAreInGame = useMemo(() => {
     if (!data || !playerId) return false
@@ -85,6 +105,19 @@ export default function GamePage() {
   const [rolling, setRolling] = useState(false)
   const [rollAnim, setRollAnim] = useState<{ d1: number; d2: number }>({ d1: 1, d2: 1 })
 
+  // Highlight tiles that produced for a short time after a roll.
+  const [rollHighlight, setRollHighlight] = useState<{ num: number; at: number } | null>(null)
+  useEffect(() => {
+    const sum = data?.lastRoll ? (data.lastRoll.d1 + data.lastRoll.d2) : null
+    if (!sum) return
+    setRollHighlight({ num: sum, at: Date.now() })
+    const t = setTimeout(() => setRollHighlight(null), 1300)
+    return () => clearTimeout(t)
+  }, [data?.lastRoll?.d1, data?.lastRoll?.d2])
+
+  // Lightweight gain toast after you receive resources from a roll.
+  const [gainToast, setGainToast] = useState<string | null>(null)
+
 
   const jumpTo = (id: string) => {
     if (typeof document === 'undefined') return
@@ -95,10 +128,27 @@ export default function GamePage() {
   async function act(type: string, payload?: any): Promise<GameState | undefined> {
     if (!playerId) return
     try {
+      const prev = data
       const next = await postJSON<GameState>(`/api/games/${gameId}/action`, { playerId, type, payload })
       mutate(next, false)
       if (type === 'end_turn') setBuildMode('none')
       if (type === 'build_road' || type === 'build_settlement' || type === 'build_city') setBuildMode('none')
+      // If this was a roll, show a small "you received" toast based on the diff.
+      if (type === 'roll' && prev?.you?.resources && next?.you?.resources) {
+        const before = prev.you.resources as any
+        const after = next.you.resources as any
+        const keys: Array<keyof typeof before> = ['wood', 'brick', 'wheat', 'sheep', 'ore']
+        const diffs: string[] = []
+        const map: Record<string, string> = { wood: HU.wood, brick: HU.brick, wheat: HU.wheat, sheep: HU.sheep, ore: HU.ore }
+        for (const k of keys) {
+          const d = Number(after[k] ?? 0) - Number(before[k] ?? 0)
+          if (d > 0) diffs.push(`+${d} ${map[String(k)] ?? String(k)}`)
+        }
+        if (diffs.length) {
+          setGainToast(`Kaptál: ${diffs.join(', ')}`)
+          setTimeout(() => setGainToast(null), 2200)
+        }
+      }
       return next
     } catch (e: any) {
       setToast(e?.message ?? String(e))
@@ -194,6 +244,12 @@ export default function GamePage() {
       {toast ? (
         <div className="fixed left-1/2 top-3 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100 backdrop-blur">
           {toast}
+        </div>
+      ) : null}
+
+      {gainToast ? (
+        <div className="fixed left-1/2 top-14 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100 backdrop-blur">
+          {gainToast}
         </div>
       ) : null}
 
@@ -325,6 +381,8 @@ export default function GamePage() {
         <TopBar game={data} />
       </div>
 
+      <TurnBanner game={data} meId={playerId} />
+
       <div className="relative mx-auto mt-3 w-full max-w-[1400px] px-3 pb-6">
         {/* Board as the main focus */}
         <div className="flex flex-col gap-3 lg:flex-row">
@@ -335,6 +393,8 @@ export default function GamePage() {
             <Board
               game={data}
               me={playerId}
+              highlightRollNumber={rollHighlight?.num ?? null}
+              highlightRollKey={rollHighlight?.at ?? null}
               onPlaceSettlement={(nodeId) => act('place_settlement', { nodeId })}
               onPlaceRoad={(edgeId) => act('place_road', { edgeId })}
               buildMode={buildMode}

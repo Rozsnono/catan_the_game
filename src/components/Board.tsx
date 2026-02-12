@@ -78,6 +78,8 @@ function portIcon(kind: PortKind) {
 export function Board({
   game,
   me,
+  highlightRollNumber,
+  highlightRollKey,
   onPlaceSettlement,
   onPlaceRoad,
   buildMode,
@@ -88,6 +90,8 @@ export function Board({
 }: {
   game: GameState
   me: string
+  highlightRollNumber?: number | null
+  highlightRollKey?: number | null
   onPlaceSettlement: (nodeId: string) => void
   onPlaceRoad: (edgeId: string) => void
   buildMode: 'none' | 'road' | 'settlement' | 'city'
@@ -383,6 +387,11 @@ export function Board({
               const corners = hexCorners(c, size)
               const d = corners.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z'
               const fill = `url(#p_${t.type})`
+              const isRollHit =
+                !!highlightRollNumber &&
+                t.numberToken === highlightRollNumber &&
+                !t.hasRobber &&
+                t.type !== 'desert'
               return (
                 <g key={t.id}>
                   <path
@@ -409,6 +418,21 @@ export function Board({
                     }}
                     onClick={robberMoveMode && onMoveRobber ? () => onMoveRobber(t.id) : undefined}
                   />
+
+                  {/* Brief pulse on tiles that produced on the last roll */}
+                  {isRollHit ? (
+                    <path
+                      key={`rollhit:${t.id}:${highlightRollKey ?? ''}`}
+                      d={d}
+                      fill="transparent"
+                      stroke="rgba(34,197,94,.78)"
+                      strokeWidth={6}
+                      filter="url(#f_glowGreen)"
+                      className="svg-rollHit"
+                      pointerEvents="none"
+                      opacity={0.9}
+                    />
+                  ) : null}
                   {robberMoveMode && !t.hasRobber ? (
                     <path
                       d={d}

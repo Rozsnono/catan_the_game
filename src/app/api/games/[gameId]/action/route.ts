@@ -24,6 +24,7 @@ import {
   tradeWithBank,
   validateResourceName,
 } from '@/lib/gameLogic'
+import { publishGameUpdate } from '@/lib/realtimeBus'
 
 const Body = z.object({
   playerId: z.string().min(3),
@@ -159,6 +160,8 @@ export async function POST(req: Request, { params }: { params: { gameId: string 
     maybeFinishGame(game as any)
 
     await game.save()
+    // Notify connected clients (SSE) to re-fetch game state.
+    publishGameUpdate(params.gameId)
     return NextResponse.json(sanitizeForClient(game as any, body.playerId))
   } catch (e: any) {
     return new NextResponse(e?.message ?? 'Hiba', { status: 400 })
