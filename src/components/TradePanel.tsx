@@ -95,7 +95,7 @@ export function TradePanel({
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/5 p-2">
-            <div className="text-xs text-slate-400">Mit adsz / mit kérsz</div>
+            <div className="text-xs text-slate-400">Mit adsz</div>
             <div className="mt-1 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
 
               <Select
@@ -113,7 +113,12 @@ export function TradePanel({
                 onChange={(e) => setGiveQty(Number(e.target.value))}
                 disabled={!canTrade}
               />
+            </div>
+          </div>
 
+          <div className="rounded-xl border border-white/10 bg-white/5 p-2">
+            <div className="text-xs text-slate-400">Mit kérsz</div>
+            <div className="mt-1 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
               <Select
                 className=""
                 label={<ResourcePill resource={getRes} label={HU[getRes]} />}

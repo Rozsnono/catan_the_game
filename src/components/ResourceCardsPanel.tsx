@@ -80,7 +80,7 @@ export function ResourceCardsPanel({ game }: { game: GameState }) {
             <div className="relative">
               <HexIcon patternId={it.pattern} />
               <div className="absolute inset-0 flex items-center justify-center text-slate-100">
-                <ResourceIcon resource={it.key} className="h-6 w-6 opacity-90" />
+                <ResourceIcon resource={it.key} width={32} height={32} className="h-12 w-12 opacity-90" />
               </div>
             </div>
             <div className="min-w-0">

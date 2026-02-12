@@ -550,7 +550,7 @@ export function Board({
                     y1={startA.y}
                     x2={labelPos.x}
                     y2={labelPos.y}
-                    stroke="rgba(226,232,240,.22)"
+                    stroke="rgba(146, 102, 63, 0.5)"
                     strokeWidth={6}
                     strokeLinecap="round"
                   />
@@ -559,7 +559,7 @@ export function Board({
                     y1={startB.y}
                     x2={labelPos.x}
                     y2={labelPos.y}
-                    stroke="rgba(226,232,240,.22)"
+                    stroke="rgba(146, 102, 63, 0.5)"
                     strokeWidth={6}
                     strokeLinecap="round"
                   />

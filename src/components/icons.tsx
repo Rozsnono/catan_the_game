@@ -34,9 +34,10 @@ export function ResourceIcon({ resource, title, ...props }: ResourceIconProps) {
     case 'wood':
       return (
         <Base {...props} title={title ?? 'Fa'} className='text-green-500'>
-          <path d="M12 3c-2.8 1.6-4.2 3.6-4.2 5.9 0 2.3-1.3 3.7-2.8 4.6 1.6.8 3.2 1.9 3.2 4.2h7.6c0-2.3 1.6-3.4 3.2-4.2-1.6-.9-2.8-2.3-2.8-4.6C19 6.6 17.6 4.6 12 3z" />
-          <path d="M12 14v7" />
-          <path d="M9.5 21h5" />
+          <path d="M6.522 7a5.5 5.5 0 0 1 10.956 0h.022a4.5 4.5 0 1 1 0 9h-11a4.5 4.5 0 1 1 0-9h.022Z"></path>
+          <path d="m12 14 2.5-2.5"></path>
+          <path d="m12 12.5-3-3"></path>
+          <path d="M12 22V9"></path>
         </Base>
       )
     case 'brick':

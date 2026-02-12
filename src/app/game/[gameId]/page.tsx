@@ -17,7 +17,6 @@ import { ChatPanel } from '@/components/ChatPanel'
 import { DevCardsPanel } from '@/components/DevCardsPanel'
 import { StatsPanel } from '@/components/StatsPanel'
 import { MenuIcon, ResourceIcon } from '@/components/icons'
-import { Die } from '@/components/Dice'
 import { TurnBanner } from '@/components/TurnBanner'
 import { HU } from '@/types/translate'
 
@@ -253,22 +252,6 @@ export default function GamePage() {
         </div>
       ) : null}
 
-      {rolling ? (
-        <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 shadow-2xl backdrop-blur">
-            <div className="flex items-center gap-2">
-              <Die value={rollAnim.d1} />
-              <span className="text-slate-500">+</span>
-              <Die value={rollAnim.d2} />
-              <div className="ml-2 text-right">
-                <div className="text-[10px] text-slate-400">Dobás</div>
-                <div className="text-2xl font-extrabold text-slate-100">{rollAnim.d1 + rollAnim.d2}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <div className="fixed left-1/2 top-3 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 bg-transparent">
         {waitingForPlayers ? (
           <div className="fixed left-1/2 top-14 z-40 -translate-x-1/2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 backdrop-blur">
@@ -497,6 +480,8 @@ export default function GamePage() {
               me={playerId}
               onRoll={() => rollWithAnim()}
               onEndTurn={() => act('end_turn')}
+              rolling={rolling}
+              rollAnim={rollAnim}
               buildMode={buildMode}
               setBuildMode={setBuildMode}
               onJumpTrade={() => setPanel('trade')}
@@ -517,6 +502,8 @@ export default function GamePage() {
                     me={playerId}
                     onRoll={() => rollWithAnim()}
                     onEndTurn={() => act('end_turn')}
+                    rolling={rolling}
+                    rollAnim={rollAnim}
                     buildMode={buildMode}
                     setBuildMode={setBuildMode}
                     onJumpTrade={() => setPanel('trade')}
@@ -543,6 +530,8 @@ export default function GamePage() {
                     me={playerId}
                     onRoll={() => rollWithAnim()}
                     onEndTurn={() => act('end_turn')}
+                    rolling={rolling}
+                    rollAnim={rollAnim}
                     buildMode={buildMode}
                     setBuildMode={setBuildMode}
                     onJumpTrade={() => setPanel('trade')}
@@ -572,6 +561,9 @@ export default function GamePage() {
                     onReject={(offerId) => act('trade_offer_reject', { offerId })}
                     onCancel={(offerId) => act('trade_offer_cancel', { offerId })}
                   />
+                  <div className="mt-3">
+                    <BankPanel game={data} onTrade={(give, get) => act('trade_bank', { give, get })} />
+                  </div>
                 </PanelShell>
               ) : null}
 

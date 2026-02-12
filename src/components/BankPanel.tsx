@@ -35,11 +35,11 @@ export function BankPanel({ game, onTrade }: { game: GameState; onTrade: (give: 
   const owned = [...ownedThree, ...ownedTwoToOne]
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl shadow-black/20">
+    <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl shadow-black/20 flex flex-col gap-2">
       <h3 className="mb-3 text-sm font-semibold text-slate-100">Bank / Kikötők</h3>
 
-      <div className="mb-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-300">
-        Aktív arány: <span className="font-semibold text-slate-100">{rate}:1</span> ({give} → bármi)
+      <div className="rounded-xl border border-white/10 bg-white/5 p-2">
+        Aktív arány: <span className="font-semibold text-slate-100">{rate}:1</span> ({HU[give]} → bármi)
         {owned.length ? (
           <div className="mt-1 text-slate-400">Kikötőid: {owned.join(' · ')}</div>
         ) : (
@@ -47,29 +47,38 @@ export function BankPanel({ game, onTrade }: { game: GameState; onTrade: (give: 
         )}
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
-        <Select
-          className="col-start-1"
-          label={give ? <ResourcePill resource={give} label={HU[give]} /> : 'Adok'}
-          items={RESOURCES.map((r) => ({ label: <ResourcePill resource={r.id} label={r.name} />, onClick: () => setGive(r.id) }))}
-        />
-        <div className="text-center text-xs text-slate-400">→</div>
-        <Select
-          className="col-start-3"
-          label={get ? <ResourcePill resource={get} label={HU[get]} /> : 'Kérek'}
-          items={RESOURCES.map((r) => ({ label: <ResourcePill resource={r.id} label={r.name} />, onClick: () => setGet(r.id) }))}
-        />
-        <button
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!can}
-          onClick={() => onTrade(give, get)}
-        >
-          Csere
-        </button>
+      <div className="rounded-xl border border-white/10 bg-white/5 p-2">
+        <div className="text-xs text-slate-400">Mit adsz</div>
+        <div className="mt-1 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
+          <Select
+            className="col-start-1"
+            label={give ? <ResourcePill resource={give} label={HU[give]} /> : 'Adok'}
+            items={RESOURCES.map((r) => ({ label: <ResourcePill resource={r.id} label={r.name} />, onClick: () => setGive(r.id) }))}
+          />
+        </div>
       </div>
 
+      <div className="rounded-xl border border-white/10 bg-white/5 p-2">
+        <div className="text-xs text-slate-400">Mit kérsz</div>
+        <div className="mt-1 grid grid-cols-[1fr_auto] items-center gap-2">
+          <Select
+            className=""
+            label={get ? <ResourcePill resource={get} label={HU[get]} /> : 'Kérek'}
+            items={RESOURCES.map((r) => ({ label: <ResourcePill resource={r.id} label={r.name} />, onClick: () => setGet(r.id) }))}
+          />
+        </div>
+      </div>
+
+      <button
+        className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={!can}
+        onClick={() => onTrade(give, get)}
+      >
+        Csere
+      </button>
+
       <div className="mt-2 text-xs text-slate-500">
-        Költség: <span className="font-semibold text-slate-300">-{rate} {give}</span> → <span className="font-semibold text-slate-300">+1 {get}</span>
+        Költség: <span className="font-semibold text-slate-300">-{rate} {HU[give]}</span> → <span className="font-semibold text-slate-300">+1 {HU[get]}</span>
         <span className="ml-2">(Nálad: {have})</span>
       </div>
     </section>

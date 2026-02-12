@@ -81,8 +81,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
   animation: catanRobberSlide 220ms ease-out;
 }
 
-/* Port badge pulses on hover */
-.svg-portMarker:hover {
+/* Port badge pulses on hover.
+   IMPORTANT: don't animate the translated <g> itself, because CSS `transform` would
+   override the SVG `transform="translate(...)"` attribute and make the marker jump.
+   Animate the inner shape instead. */
+.svg-portMarker:hover .port-marker {
+  transform-box: fill-box;
   transform-origin: center;
   animation: catanPulse 900ms ease-in-out infinite;
 }
