@@ -474,12 +474,12 @@ function maybeGrantPort(game: GameDoc, playerId: string, nodeId: string) {
 
 export function addLog(game: GameDoc, msg: string) {
   game.log.push({ ts: new Date(), msg })
-  if (game.log.length > 200) game.log = game.log.slice(-200)
+  if (game.log.length > 200) game.log.splice(0, game.log.length - 200)
 }
 
 export function addChat(game: GameDoc, name: string, playerId: string | null, text: string) {
   game.chat.push({ ts: new Date(), name, playerId, text })
-  if (game.chat.length > 200) game.chat = game.chat.slice(-200)
+  if (game.chat.length > 200) game.chat.splice(0, game.chat.length - 200)
 }
 
 function edgeKey(a: string, b: string): string {
@@ -563,8 +563,8 @@ function recomputeLongestRoadAward(game: GameDoc) {
 
   // Nobody qualifies
   if (bestLen < minLength) {
-    ;(game as any).longestRoadPlayerId = null
-    ;(game as any).longestRoadLength = 0
+    ; (game as any).longestRoadPlayerId = null
+      ; (game as any).longestRoadLength = 0
     return
   }
 
@@ -599,8 +599,8 @@ function recomputeLongestRoadAward(game: GameDoc) {
     }
   }
 
-  ;(game as any).longestRoadPlayerId = finalHolder
-  ;(game as any).longestRoadLength = finalLen
+  ; (game as any).longestRoadPlayerId = finalHolder
+    ; (game as any).longestRoadLength = finalLen
 
   if (finalHolder) {
     const holder: any = game.players.find((p: any) => idEq(p._id, finalHolder))
@@ -646,23 +646,23 @@ export async function startIfPossible(game: GameDoc) {
   if (mapType === 'custom' && (game as any).mapTemplateId) {
     const tmpl = await MapTemplate.findById((game as any).mapTemplateId).lean()
     if (tmpl && Array.isArray(tmpl.hexes) && tmpl.hexes.length > 0) {
-      game.tiles = makeTilesFromCoords(game._id, tmpl.hexes as any, { deserts: 1, seedTag: 'custom' })
+      game.tiles = makeTilesFromCoords(game._id, tmpl.hexes as any, { deserts: 1, seedTag: 'custom' }) as any
       const tPorts = (tmpl.ports ?? []) as any[]
-      ;(game as any).ports = tPorts.length ? makePortsFromTemplate(game.tiles as any, tPorts, game._id) : makeClassicPorts(game._id, game.tiles as any)
+        ; (game as any).ports = tPorts.length ? makePortsFromTemplate(game.tiles as any, tPorts, game._id) : makeClassicPorts(game._id, game.tiles as any)
     } else {
-      game.tiles = makeTiles(game._id, 'classic')
-      ;(game as any).ports = makeClassicPorts(game._id, game.tiles as any)
+      game.tiles = makeTiles(game._id, 'classic') as any
+        ; (game as any).ports = makeClassicPorts(game._id, game.tiles as any)
     }
   } else {
-    game.tiles = makeTiles(game._id, mapType)
-    ;(game as any).ports = makeClassicPorts(game._id, game.tiles as any)
+    game.tiles = makeTiles(game._id, mapType) as any
+      ; (game as any).ports = makeClassicPorts(game._id, game.tiles as any)
   }
   game.phase = 'setup'
   game.setupStep = 'place_settlement'
-  game.setup.round = 1
-  game.setup.direction = 'forward'
-  game.setup.pendingSettlementNodeId = null
-  game.setup.done = new Map()
+  game.setup!.round = 1
+  game.setup!.direction = 'forward'
+  game.setup!.pendingSettlementNodeId = null
+  game.setup!.done = new Map()
   game.currentPlayerId = game.players[0]._id
     ; (game as any).turnHasRolled = false
   ensureDevFields(game)
@@ -684,7 +684,7 @@ export function placeSettlement(game: GameDoc, playerId: string, nodeId: string)
   if (game.setupStep !== 'place_settlement') throw new Error('Most út lerakása következik.')
   requireTurn(game, playerId)
 
-  const donePairs = game.setup.done.get(playerId) ?? 0
+  const donePairs = game.setup!.done.get(playerId) ?? 0
   if (donePairs >= 2) throw new Error('Setup-ban már leraktad mindkét település+út párost.')
 
   const occupied = new Set(game.nodes.map((n) => n.nodeId))
@@ -702,7 +702,7 @@ export function placeSettlement(game: GameDoc, playerId: string, nodeId: string)
 
   // Classic Catan rule: after placing your SECOND settlement in setup,
   // you immediately receive starting resources from adjacent hexes.
-  if (game.setup.round === 2 && donePairs === 1) {
+  if (game.setup!.round === 2 && donePairs === 1) {
     const gains: Partial<Record<Resource, number>> = {}
     const size = 48
     for (const t of game.tiles as any as HexTile[]) {
@@ -713,7 +713,7 @@ export function placeSettlement(game: GameDoc, playerId: string, nodeId: string)
       const corners = hexCorners(center, size)
       const cornerNodeIds = corners.map((pt) => pointToNodeId(pt))
       if (!cornerNodeIds.includes(nodeId)) continue
-      p.resources[res] = (p.resources[res] ?? 0) + 1
+      p.resources![res] = (p.resources![res] ?? 0) + 1
       gains[res] = ((gains[res] ?? 0) as number) + 1
     }
 
@@ -724,7 +724,7 @@ export function placeSettlement(game: GameDoc, playerId: string, nodeId: string)
     addLog(game, gainsText ? `${p.name} kezdő erőforrásokat kapott: ${gainsText}.` : `${p.name} nem kapott kezdő erőforrást (sivatag/rabló vagy víz mellett).`)
   }
 
-  game.setup.pendingSettlementNodeId = nodeId
+  game.setup!.pendingSettlementNodeId = nodeId
   game.setupStep = 'place_road'
   addLog(game, `${p.name} települést rakott.`)
 }
@@ -761,7 +761,6 @@ function addResourceGain(game: GameDoc, playerId: string, gain: Partial<Record<R
 
 export function maybeFinishGame(game: GameDoc) {
   if (game.phase !== 'main') return
-  if (game.phase === 'finished') return
   const maxVP = Number((game as any).settings?.maxVictoryPoints ?? 10)
   const winners = (game.players as any[]).filter((p) => Number(p.victoryPoints ?? 0) >= maxVP)
   if (!winners.length) return
@@ -771,8 +770,8 @@ export function maybeFinishGame(game: GameDoc) {
   if (!winner) winner = winners[0]
 
   game.phase = 'finished'
-  ;(game as any).winnerPlayerId = String(winner._id)
-  ;(game as any).finishedAt = new Date()
+    ; (game as any).winnerPlayerId = String(winner._id)
+    ; (game as any).finishedAt = new Date()
   addLog(game, `🏁 Játék vége! Győztes: ${winner.name} (${winner.victoryPoints} pont).`)
 }
 
@@ -913,7 +912,7 @@ export function placeRoad(game: GameDoc, playerId: string, edgeId: string) {
   const en = graph.edgeNodes[edgeId]
   if (!en) throw new Error('Érvénytelen él.')
 
-  const pending = game.setup.pendingSettlementNodeId
+  const pending = game.setup!.pendingSettlementNodeId
   if (!pending) throw new Error('Nincs pending település (belső hiba).')
   if (en.a !== pending && en.b !== pending) throw new Error('Setup-ban az út a frissen lerakott településhez kell csatlakozzon.')
 
@@ -924,9 +923,9 @@ export function placeRoad(game: GameDoc, playerId: string, edgeId: string) {
   addLog(game, `${p.name} utat rakott.`)
 
   // Mark setup progress
-  const done = (game.setup.done.get(playerId) ?? 0) + 1
-  game.setup.done.set(playerId, done)
-  game.setup.pendingSettlementNodeId = null
+  const done = (game.setup!.done.get(playerId) ?? 0) + 1
+  game.setup!.done.set(playerId, done)
+  game.setup!.pendingSettlementNodeId = null
   game.setupStep = 'place_settlement'
 
   // Advance turn with snake order
@@ -935,13 +934,13 @@ export function placeRoad(game: GameDoc, playerId: string, edgeId: string) {
 
   let customNextLog: string | null = null
 
-  const allDone2 = () => game.players.every((pl) => (game.setup.done.get(pl._id) ?? 0) >= 2)
+  const allDone2 = () => game.players.every((pl) => (game.setup!.done.get(pl._id) ?? 0) >= 2)
 
-  if (game.setup.direction === 'forward') {
+  if (game.setup!.direction === 'forward') {
     if (idx === last) {
       // switch to backward for round 2, current stays last
-      game.setup.direction = 'backward'
-      game.setup.round = 2
+      game.setup!.direction = 'backward'
+      game.setup!.round = 2
       game.currentPlayerId = game.players[last]._id
       customNextLog = `Setup 2. kör (visszafelé) indul: ${game.players[last].name} jön.`
     } else {
@@ -1020,7 +1019,7 @@ export function rollDice(game: GameDoc, playerId: string) {
       const amount = pl.kind === 'city' ? 2 : 1
       const target = game.players.find((pp) => pp._id === pl.playerId)
       if (!target) continue
-      target.resources[res] = (target.resources[res] ?? 0) + amount
+      target.resources![res] = (target.resources![res] ?? 0) + amount
       payouts[target._id] = payouts[target._id] ?? {}
       payouts[target._id]![res] = ((payouts[target._id]![res] ?? 0) as number) + amount
     }
@@ -1259,7 +1258,7 @@ export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
     roads: p.roads,
     settlements: p.settlements,
     cities: p.cities,
-    resourceCount: Object.values(p.resources as any).reduce((a: number, b: number) => a + (b as number), 0),
+    resourceCount: Object.values(p.resources as any).reduce((a: number, b: any) => a + Number(b), 0),
   }))
 
   const you = maybePlayerId
@@ -1347,7 +1346,7 @@ export function sanitizeForClient(game: GameDoc, maybePlayerId?: string) {
             playerId: asId(p._id),
             name: p.name,
             color: p.color,
-            resourceCount: Object.values(p.resources as any).reduce((a: number, b: number) => a + (b as number), 0),
+            resourceCount: Object.values(p.resources as any).reduce((a: number, b: any) => a + Number(b), 0),
             // Only the robber mover sees exact stealable resources (requested feature).
             ...(viewerIsMover && Boolean(r.awaitingSteal)
               ? {
