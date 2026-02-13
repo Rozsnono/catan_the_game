@@ -56,23 +56,14 @@ export default function GamePage() {
     { revalidateOnFocus: true }
   )
 
-  // Realtime updates (Server-Sent Events). Falls back to focus revalidation.
-  useEffect(() => {
-    if (!hydrated || !playerId) return
-    if (typeof EventSource === 'undefined') return
-
-    const es = new EventSource(`/api/games/${gameId}/events`)
-    es.onmessage = () => {
-      // any event means state may have changed
-      mutate()
-    }
-    es.onerror = () => {
-      // silently let it reconnect; browsers handle retries
-    }
-    return () => {
-      es.close()
-    }
-  }, [gameId, hydrated, playerId, mutate])
+// Polling updates (every 2s) — simple and reliable for "play with friends" hosting.
+useEffect(() => {
+  if (!hydrated || !playerId) return
+  const t = setInterval(() => {
+    mutate()
+  }, 2000)
+  return () => clearInterval(t)
+}, [hydrated, playerId, mutate])
 
   const youAreInGame = useMemo(() => {
     if (!data || !playerId) return false

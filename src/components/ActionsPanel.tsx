@@ -74,14 +74,14 @@ export function ActionsPanel({
         {hint}
       </div>
 
-      {rolling && rollAnim ? (
+      {/* {false && (rolling && rollAnim) ? (
         <div className="mb-3">
           <div className="mb-2 text-xs text-slate-400">Dobás…</div>
           <DiceRow d1={rollAnim.d1} d2={rollAnim.d2} sum={rollAnim.d1 + rollAnim.d2} />
         </div>
-      ) : null}
+      ) : null} */}
 
-      {game.phase === 'main' && game.lastRoll && !rolling ? (
+      {game.phase === 'main' && game.lastRoll ? (
         <div>
           <div className="mb-2 text-xs text-slate-400">
             Utolsó dobás: <span className="font-semibold text-slate-200">{lastRollName}</span>
