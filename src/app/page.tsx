@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
+import { useEffect } from 'react'
 
 export default function Home() {
-  if (typeof window !== 'undefined') {
+  useEffect(() => {
     redirect('/lobby')
-  }
+  }, [typeof window])
 }
