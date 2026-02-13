@@ -992,7 +992,12 @@ export function rollDice(game: GameDoc, playerId: string) {
   // Resource distribution (sum != 7)
   if (sum === 7) {
     startRobber(game, playerId, 'roll7')
-    stealHalfResources(game);
+    const shouldDiscard = (game as any).settings?.discardOnSeven !== false
+    if (shouldDiscard) {
+      stealHalfResources(game)
+    } else {
+      addLog(game, `7-es dobás: eldobás kikapcsolva a beállításokban.`)
+    }
     addLog(game, `7-es dobás: helyezd át a rablót.`)
     return sum
   }

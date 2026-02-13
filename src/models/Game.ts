@@ -159,6 +159,8 @@ const GameSchema = new Schema(
     settings: {
       maxVictoryPoints: { type: Number, default: 10 },
       maxPlayers: { type: Number, default: 4 },
+      // If true, players with >7 cards must discard half (floor) when a 7 is rolled.
+      discardOnSeven: { type: Boolean, default: true },
     },
     phase: { type: String, required: true, default: 'lobby' },
     setupStep: { type: String, required: true, default: 'place_settlement' },

@@ -20,7 +20,7 @@ export type MapTemplate = {
   updatedAt?: string
 }
 
-export type GameSettings = { maxVictoryPoints: number; maxPlayers: number }
+export type GameSettings = { maxVictoryPoints: number; maxPlayers: number; discardOnSeven?: boolean }
 
 export type SetupStep = 'place_settlement' | 'place_road'
 

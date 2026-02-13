@@ -11,6 +11,7 @@ const Body = z.object({
   templateId: z.string().min(3).optional(),
   maxVictoryPoints: z.coerce.number().int().min(5).max(20).optional(),
   maxPlayers: z.coerce.number().int().min(2).max(4).optional(),
+  discardOnSeven: z.coerce.boolean().optional(),
 })
 
 export async function POST(req: Request) {
@@ -22,7 +23,11 @@ export async function POST(req: Request) {
     _id: gameId,
     mapType: isCustom ? 'custom' : body.mapType ?? 'classic',
     mapTemplateId: body.templateId ?? null,
-    settings: { maxVictoryPoints: body.maxVictoryPoints ?? 10, maxPlayers: body.maxPlayers ?? 4 },
+    settings: {
+      maxVictoryPoints: body.maxVictoryPoints ?? 10,
+      maxPlayers: body.maxPlayers ?? 4,
+      discardOnSeven: body.discardOnSeven ?? true,
+    },
     phase: 'lobby',
     setupStep: 'place_settlement',
     currentPlayerId: null,
